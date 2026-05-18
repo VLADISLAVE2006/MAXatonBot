@@ -1,0 +1,25 @@
+{
+    "name": "maxaton-bot",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "dev": "tsx --watch src/index.ts",
+        "build": "tsdown"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "type": "module",
+    "packageManager": "pnpm@10.30.3",
+    "devDependencies": {
+        "@types/node": "^25.8.0",
+        "tsdown": "^0.22.0",
+        "tsx": "^4.22.0"
+    },
+    "dependencies": {
+        "@maxhub/max-bot-api": "^0.2.2",
+        "dotenv": "^17.4.2",
+        "zod": "^4.4.3"
+    }
+}
