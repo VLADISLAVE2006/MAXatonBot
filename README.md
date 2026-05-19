@@ -39,7 +39,7 @@ X-API-Key: very-secret-key-2025
   "agreed": true,
   "agreement_version": "1.0"
 }
-
+```
 
 ## 2. Сохранение ФИО
 
