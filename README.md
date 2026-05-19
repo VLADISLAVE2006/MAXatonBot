@@ -39,3 +39,18 @@ X-API-Key: very-secret-key-2025
   "agreed": true,
   "agreement_version": "1.0"
 }
+
+
+## 2. Сохранение ФИО
+
+**POST** `/api/user/profile`
+
+**Заголовки:** те же (`Content-Type` и `X-API-Key`)
+
+**Тело (JSON):**
+
+```json
+{
+  "user_id": 123456789,
+  "full_name": "Иванов Иван Иванович"
+}
