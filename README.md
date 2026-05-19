@@ -27,6 +27,7 @@
 
 **Заголовки:**
 Content-Type: application/json
+
 X-API-Key: very-secret-key-2025
 
 
