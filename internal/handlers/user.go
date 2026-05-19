@@ -7,6 +7,8 @@ import (
     "time"
 
     "api/internal/db"
+	"strconv"
+	"log"
 )
 
 // ConsentRequest структура тела запроса для согласия
@@ -122,4 +124,135 @@ func HandleProfile(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", "application/json")
     w.WriteHeader(http.StatusOK)
     json.NewEncoder(w).Encode(map[string]string{"status": "profile updated"})
+}
+
+
+
+
+// HandleGetRole возвращает роль пользователя и флаг заявки
+func HandleGetRole(w http.ResponseWriter, r *http.Request) {
+    userIDStr := r.URL.Query().Get("user_id")
+    if userIDStr == "" {
+        writeError(w, http.StatusBadRequest, "user_id is required")
+        return
+    }
+    userID, err := strconv.ParseInt(userIDStr, 10, 64)
+    if err != nil {	
+        writeError(w, http.StatusBadRequest, "invalid user_id")
+        return
+    }
+
+    var role string
+    var requestedOrganizer bool
+    err = db.DB.QueryRow(`
+        SELECT role, COALESCE(requested_organizer, false) 
+        FROM users WHERE user_id = $1`, userID).Scan(&role, &requestedOrganizer)
+    if err == sql.ErrNoRows {
+        writeError(w, http.StatusNotFound, "user not found")
+        return
+    }
+    if err != nil {
+        log.Printf("GetRole DB error: %v", err)
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]interface{}{
+        "role":                role,
+        "requested_organizer": requestedOrganizer,
+    })
+}
+
+
+
+// Запрос админу на получение роли организатора
+type RequestOrganizerRequest struct {
+    UserID int64 `json:"user_id"`
+}
+
+func HandleRequestOrganizer(w http.ResponseWriter, r *http.Request) {
+    var req RequestOrganizerRequest
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        writeError(w, http.StatusBadRequest, "invalid JSON")
+        return
+    }
+    if req.UserID == 0 {
+        writeError(w, http.StatusBadRequest, "user_id is required")
+        return
+    }
+
+    // Проверим, существует ли пользователь
+    var exists bool
+    err := db.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE user_id = $1)", req.UserID).Scan(&exists)
+    if err != nil || !exists {
+        writeError(w, http.StatusNotFound, "user not found")
+        return
+    }
+
+    // Обновим флаг заявки
+    _, err = db.DB.Exec("UPDATE users SET requested_organizer = true WHERE user_id = $1", req.UserID)
+    if err != nil {
+        log.Printf("RequestOrganizer DB error: %v", err)
+        writeError(w, http.StatusInternalServerError, "failed to update")
+        return
+    }
+
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(map[string]string{"status": "request sent"})
+}
+
+
+//назначение роли организатора админом
+type SetRoleRequest struct {
+    AdminUserID int64  `json:"admin_user_id"`
+    TargetUserID int64  `json:"target_user_id"`
+    Role         string `json:"role"` // "organizer" или "applicant"
+}
+
+func HandleSetRole(w http.ResponseWriter, r *http.Request) {
+    var req SetRoleRequest
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        writeError(w, http.StatusBadRequest, "invalid JSON")
+        return
+    }
+    if req.AdminUserID == 0 || req.TargetUserID == 0 {
+        writeError(w, http.StatusBadRequest, "admin_user_id and target_user_id required")
+        return
+    }
+    if req.Role != "organizer" && req.Role != "applicant" {
+        writeError(w, http.StatusBadRequest, "role must be 'organizer' or 'applicant'")
+        return
+    }
+
+    // Проверяем, что админ существует и имеет роль admin
+    var adminRole string
+    err := db.DB.QueryRow("SELECT role FROM users WHERE user_id = $1", req.AdminUserID).Scan(&adminRole)
+    if err == sql.ErrNoRows {
+        writeError(w, http.StatusForbidden, "admin user not found")
+        return
+    }
+    if err != nil {
+        log.Printf("SetRole DB error (admin): %v", err)
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
+    if adminRole != "admin" {
+        writeError(w, http.StatusForbidden, "user is not an admin")
+        return
+    }
+
+    // Обновляем роль целевого пользователя и сбрасываем флаг заявки
+    _, err = db.DB.Exec(`
+        UPDATE users 
+        SET role = $1, requested_organizer = false 
+        WHERE user_id = $2`, req.Role, req.TargetUserID)
+    if err != nil {
+        log.Printf("SetRole DB error (update): %v", err)
+        writeError(w, http.StatusInternalServerError, "failed to update role")
+        return
+    }
+
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(map[string]string{"status": "role updated"})
 }

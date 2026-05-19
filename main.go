@@ -31,6 +31,9 @@ func main() {
     // Эндпоинты с защитой API-ключом
     router.HandleFunc("/api/user/consent", middleware.APIAuth(handlers.HandleConsent)).Methods("POST")
     router.HandleFunc("/api/user/profile", middleware.APIAuth(handlers.HandleProfile)).Methods("POST")
+	router.HandleFunc("/api/user/role", middleware.APIAuth(handlers.HandleGetRole)).Methods("GET")
+	router.HandleFunc("/api/user/request-organizer", middleware.APIAuth(handlers.HandleRequestOrganizer)).Methods("POST")
+	router.HandleFunc("/api/admin/set-role", middleware.APIAuth(handlers.HandleSetRole)).Methods("POST")
 
     // Дополнительно: публичный эндпоинт для проверки работоспособности (без ключа)
     router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

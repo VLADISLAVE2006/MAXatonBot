@@ -7,6 +7,7 @@ import (
     "os"
 
     _ "github.com/lib/pq" // драйвер PostgreSQL
+	"strconv"
 )
 
 // DB - глобальный объект базы данных (можно использовать и без глобальной переменной, но для простоты)
@@ -45,7 +46,8 @@ func InitDB() error {
         role            TEXT NOT NULL DEFAULT 'applicant',
         consent_given   BOOLEAN NOT NULL DEFAULT false,
         consent_date    TIMESTAMP WITH TIME ZONE,
-        consent_version TEXT
+        consent_version TEXT,
+		requested_organizer BOOLEAN DEFAULT FALSE
     );`
     _, err = DB.Exec(createTableSQL)
     if err != nil {
@@ -53,5 +55,33 @@ func InitDB() error {
     }
 
     log.Println("Table 'users' is ready")
+
+	 if err := ensureAdmin(); err != nil {
+        log.Printf("Warning: could not ensure admin: %v", err)
+    }
     return nil
+}
+
+
+// создаем админа при первом запуске таблиццы
+func ensureAdmin() error {
+    adminIDStr := os.Getenv("ADMIN_USER_ID")
+    if adminIDStr == "" {
+        log.Println("ADMIN_USER_ID not set, skipping admin initialization")
+        return nil
+    }
+    adminID, err := strconv.ParseInt(adminIDStr, 10, 64)
+    if err != nil {
+        return fmt.Errorf("invalid ADMIN_USER_ID: %w", err)
+    }
+
+    _, err = DB.Exec(`
+        INSERT INTO users (user_id, role, consent_given, full_name, consent_date, consent_version)
+        VALUES ($1, 'admin', true, 'Administrator', NOW(), '1.0')
+        ON CONFLICT (user_id) DO UPDATE SET
+            role = 'admin',
+            consent_given = true,
+            consent_date = NOW()
+    `, adminID)
+    return err
 }
