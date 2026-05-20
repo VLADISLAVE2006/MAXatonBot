@@ -1,7 +1,7 @@
-import { Keyboard, type Bot, type Context } from "@maxhub/max-bot-api";
-import type { Update } from "@maxhub/max-bot-api/types";
-import { getSession, setSession, setStep, mergeData, resetSession } from "@/context";
+import { Keyboard, type Bot } from "@maxhub/max-bot-api";
+import { getSession, setSession, setStep, mergeData, resetSession, type AppContext } from "@/context";
 import { api } from "@/api";
+import { fileDownload } from "@/utils/file-download";
 
 const ConsentKeyboard = Keyboard.inlineKeyboard([
     [
@@ -10,7 +10,7 @@ const ConsentKeyboard = Keyboard.inlineKeyboard([
     ],
 ]);
 
-export default function (bot: Bot) {
+export default function (bot: Bot<AppContext>) {
     bot.on("bot_started", startCommand);
     bot.command("start", startCommand);
 
@@ -18,12 +18,17 @@ export default function (bot: Bot) {
     bot.on("message_created", handleMessage);
 }
 
-function startCommand(ctx: Context<Update>) {
+function startCommand(ctx: AppContext) {
     const userId = ctx.user?.user_id;
     if (!userId) return;
 
     resetSession(userId);
-    setSession(userId, { flow: "registration", step: "registration/consent", data: {} });
+    setSession(userId, {
+        flow: "registration",
+        step: "registration/consent",
+        data: {},
+        role: ctx.user.role,
+    });
 
     ctx.reply(
         "Привет, я бот для записи на мероприятия университета!" +
@@ -38,15 +43,15 @@ function startCommand(ctx: Context<Update>) {
     }, 250);
 }
 
-async function handleCallback(ctx: Context<Update>) {
+async function handleCallback(ctx: AppContext) {
     const userId = ctx.user?.user_id;
     if (!userId) return;
     const callbackPayload = ctx.callback?.payload;
 
     if (callbackPayload === "request_organizer") {
         try {
-            await api.user.requestOrganizer(userId);
-            await ctx.reply("✅ Заявка на права организатора отправлена.");
+            setStep(userId, "registration/organizer_request");
+            await ctx.reply("Для подтверждения статуса организатора укажите ваш ИНН");
         } catch {
             await ctx.reply("Не удалось отправить заявку. Попробуйте еще раз.");
         }
@@ -73,7 +78,12 @@ async function handleCallback(ctx: Context<Update>) {
         case "consent:decline":
             if (session.step !== "registration/consent") return;
             resetSession(userId);
-            setSession(userId, { flow: "registration", step: "registration/consent", data: {} });
+            setSession(userId, {
+                flow: "registration",
+                step: "registration/consent",
+                data: {},
+                role: ctx.user.role,
+            });
             await ctx.reply(
                 "К сожалению, без разрешения на обработку персональных данных я не смогу помочь вам. Если вы передумаете, нажмите /start.",
                 { attachments: [ConsentKeyboard] },
@@ -82,7 +92,7 @@ async function handleCallback(ctx: Context<Update>) {
     }
 }
 
-async function handleMessage(ctx: Context<Update>) {
+async function handleMessage(ctx: AppContext) {
     const userId = ctx.user?.user_id;
     if (!userId) return;
     const text = ctx.message?.body.text?.trim() ?? "";
@@ -108,5 +118,24 @@ async function handleMessage(ctx: Context<Update>) {
                 await ctx.reply("Произошла ошибка. Попробуйте еще раз.");
             }
             break;
+        case "registration/organizer_request":
+            const file = ctx.message?.body.attachments?.find((a) => a.type === "file");
+            if (!file) {
+                return ctx.reply("Пожалуйста, отправьте фотографию вашего ИНН в виде файла.");
+            }
+
+            const fileBuffer = await fileDownload(file.payload.url);
+
+            // TODO отправить файл на бэкенд для проверки
+
+            try {
+                await api.user.requestOrganizer(userId);
+                resetSession(userId);
+                await ctx.reply(
+                    "✅ Ваша заявка на статус организатора успешно отправлена! Мы свяжемся с вами после проверки предоставленной информации.",
+                );
+            } catch {
+                await ctx.reply("Произошла ошибка при отправке заявки. Попробуйте еще раз.");
+            }
     }
 }

@@ -1,11 +1,14 @@
-const _fetch = (path: string, options?: RequestInit) => {
+import { $fetch } from "ofetch";
+import type { Role } from "./types/app";
+
+const _fetch = <T>(path: string, options?: RequestInit) => {
     const headers = new Headers(options?.headers);
 
     if (process.env.API_KEY) {
         headers.set("X-API-Key", process.env.API_KEY);
     }
 
-    return fetch(`${process.env.API_URL}${path}`, {
+    return $fetch<T>(`${process.env.API_URL}${path}`, {
         ...options,
         headers,
     });
@@ -33,7 +36,10 @@ export const api = {
                 }),
             }),
         role: (userId: number) =>
-            _fetch(`/api/user/role?user_id=${userId}`, {
+            _fetch<{
+                role: Role;
+                requested_organizer: boolean;
+            }>(`/api/user/role?user_id=${userId}`, {
                 method: "GET",
             }),
         requestOrganizer: (userId: number) =>
