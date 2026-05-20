@@ -11,14 +11,14 @@ const ConsentKeyboard = Keyboard.inlineKeyboard([
 ]);
 
 export default function (bot: Bot<AppContext>) {
-    bot.on("bot_started", startCommand);
-    bot.command("start", startCommand);
+    bot.on("bot_started", startRegistration);
+    bot.command("start", startRegistration); // TODO удалить после тестов
 
     bot.on("message_callback", handleCallback);
     bot.on("message_created", handleMessage);
 }
 
-function startCommand(ctx: AppContext) {
+function startRegistration(ctx: AppContext) {
     const userId = ctx.user?.user_id;
     if (!userId) return;
 
@@ -27,7 +27,7 @@ function startCommand(ctx: AppContext) {
         flow: "registration",
         step: "registration/consent",
         data: {},
-        role: ctx.user.role,
+        role: null,
     });
 
     ctx.reply(
@@ -84,10 +84,9 @@ async function handleCallback(ctx: AppContext) {
                 data: {},
                 role: ctx.user.role,
             });
-            await ctx.reply(
-                "К сожалению, без разрешения на обработку персональных данных я не смогу помочь вам. Если вы передумаете, нажмите /start.",
-                { attachments: [ConsentKeyboard] },
-            );
+            await ctx.reply("К сожалению, без разрешения на обработку персональных данных я не смогу помочь вам.", {
+                attachments: [ConsentKeyboard],
+            });
             break;
     }
 }

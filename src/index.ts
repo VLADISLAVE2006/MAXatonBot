@@ -3,13 +3,13 @@ import "dotenv/config";
 import { env } from "@/env";
 import { initFlows } from "@/flows";
 import { api } from "@/api";
-import { AppContext, getSession, setRole } from "@/context";
+import { AppContext, getSession, setSession, setRole } from "@/context";
 
 const bot = new Bot<AppContext>(env.BOT_TOKEN!, { contextType: AppContext });
 
 bot.use(async (ctx, next) => {
-    if (ctx.updateType !== "message_created") return;
-    if (!ctx.user) return;
+    if (ctx.updateType !== "message_created") return await next();
+    if (!ctx.user) return await next();
 
     const session = getSession(ctx.user.user_id);
 
@@ -17,14 +17,17 @@ bot.use(async (ctx, next) => {
         try {
             const userInfo = await api.user.role(ctx.user.user_id);
             setRole(ctx.user.user_id, userInfo.role);
-        } catch {}
+        } catch (error) {
+            setSession(ctx.user.user_id, {
+                flow: "registration",
+                step: "registration/consent",
+                data: {},
+                role: null,
+            });
+        }
     }
 
     await next();
-});
-
-bot.on("message_created", (ctx) => {
-    ctx.reply(`attachments: ${JSON.stringify(ctx.message?.body.attachments)}`);
 });
 
 initFlows(bot);

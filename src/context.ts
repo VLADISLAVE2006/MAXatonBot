@@ -24,7 +24,7 @@ export interface Session {
     flow: FlowName | null;
     step: Step | null;
     data: Record<string, unknown>;
-    role: Role | undefined;
+    role: Role | undefined | null;
 }
 
 export const sessions = new Map<number, Session>();
