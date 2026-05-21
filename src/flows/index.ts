@@ -1,5 +1,6 @@
 import type { Bot } from "@maxhub/max-bot-api";
 import { helpCommand } from "@/commands/help";
+import { collectCommandCallbackHandlers } from "@/commands";
 import { getSession, type AppContext } from "@/context";
 import { handleRegistrationCallback, handleRegistrationMessage, startRegistration } from "./registration";
 
@@ -44,6 +45,12 @@ export function initFlows(bot: Bot<AppContext>) {
     });
 
     bot.on("message_callback", async (ctx, next) => {
+        for (const handler of collectCommandCallbackHandlers()) {
+            if (await handler(ctx)) {
+                return;
+            }
+        }
+
         for (const flow of flows) {
             if (await flow.onMessageCallback?.(ctx)) {
                 return;
