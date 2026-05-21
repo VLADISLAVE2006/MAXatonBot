@@ -1,4 +1,4 @@
-import { Keyboard, type Bot } from "@maxhub/max-bot-api";
+import { Keyboard } from "@maxhub/max-bot-api";
 import { getSession, setSession, setStep, mergeData, resetSession, type AppContext } from "@/context";
 import { api } from "@/api";
 import { fileDownload } from "@/utils/file-download";
@@ -10,15 +10,7 @@ const ConsentKeyboard = Keyboard.inlineKeyboard([
     ],
 ]);
 
-export default function (bot: Bot<AppContext>) {
-    bot.on("bot_started", startRegistration);
-    bot.command("start", startRegistration); // TODO удалить после тестов
-
-    bot.on("message_callback", handleCallback);
-    bot.on("message_created", handleMessage);
-}
-
-function startRegistration(ctx: AppContext) {
+export function startRegistration(ctx: AppContext) {
     const userId = ctx.user?.user_id;
     if (!userId) return;
 
@@ -43,40 +35,42 @@ function startRegistration(ctx: AppContext) {
     }, 250);
 }
 
-async function handleCallback(ctx: AppContext) {
+export async function handleRegistrationCallback(ctx: AppContext): Promise<boolean> {
     const userId = ctx.user?.user_id;
-    if (!userId) return;
+    if (!userId) return false;
     const callbackPayload = ctx.callback?.payload;
 
     if (callbackPayload === "request_organizer") {
         try {
             setStep(userId, "registration/organizer_request");
             await ctx.reply("Для подтверждения статуса организатора укажите ваш ИНН");
+            return true;
         } catch {
             await ctx.reply("Не удалось отправить заявку. Попробуйте еще раз.");
+            return true;
         }
-        return;
     }
 
     const session = getSession(userId);
 
-    if (session.flow !== "registration") return;
+    if (session.flow !== "registration") return false;
 
     switch (callbackPayload) {
         case "consent:accept":
-            if (session.step !== "registration/consent") return;
+            if (session.step !== "registration/consent") return false;
             try {
                 await api.user.consent(userId, true, "1.0");
                 mergeData(userId, { consentGiven: true });
                 setStep(userId, "registration/name");
                 await ctx.reply("Как Вас зовут? Введите имя и фамилию в формате: Имя Фамилия");
+                return true;
             } catch (error) {
                 await ctx.reply("Произошла ошибка. Попробуйте еще раз.");
+                return true;
             }
-            break;
 
         case "consent:decline":
-            if (session.step !== "registration/consent") return;
+            if (session.step !== "registration/consent") return false;
             resetSession(userId);
             setSession(userId, {
                 flow: "registration",
@@ -87,22 +81,28 @@ async function handleCallback(ctx: AppContext) {
             await ctx.reply("К сожалению, без разрешения на обработку персональных данных я не смогу помочь вам.", {
                 attachments: [ConsentKeyboard],
             });
-            break;
+            return true;
+
+        default:
+            return false;
     }
 }
 
-async function handleMessage(ctx: AppContext) {
+export async function handleRegistrationMessage(ctx: AppContext): Promise<boolean> {
     const userId = ctx.user?.user_id;
-    if (!userId) return;
+    if (!userId) return false;
     const text = ctx.message?.body.text?.trim() ?? "";
     const session = getSession(userId);
 
-    if (!session.flow) return;
+    if (text.startsWith("/")) return false;
+
+    if (session.flow !== "registration") return false;
 
     switch (session.step) {
         case "registration/name":
             if (!text || text.split(" ").length < 2) {
-                return ctx.reply("Пожалуйста, введите имя и фамилию (два слова).");
+                await ctx.reply("Пожалуйста, введите имя и фамилию (два слова).");
+                return true;
             }
             try {
                 await api.user.profile(userId, text);
@@ -113,14 +113,17 @@ async function handleMessage(ctx: AppContext) {
                         Keyboard.inlineKeyboard([[Keyboard.button.callback("Я организатор", "request_organizer")]]),
                     ],
                 });
+                return true;
             } catch {
                 await ctx.reply("Произошла ошибка. Попробуйте еще раз.");
+                return true;
             }
-            break;
+
         case "registration/organizer_request":
             const file = ctx.message?.body.attachments?.find((a) => a.type === "file");
             if (!file) {
-                return ctx.reply("Пожалуйста, отправьте фотографию вашего ИНН в виде файла.");
+                await ctx.reply("Пожалуйста, отправьте фотографию вашего ИНН в виде файла.");
+                return true;
             }
 
             const fileBuffer = await fileDownload(file.payload.url);
@@ -133,8 +136,13 @@ async function handleMessage(ctx: AppContext) {
                 await ctx.reply(
                     "✅ Ваша заявка на статус организатора успешно отправлена! Мы свяжемся с вами после проверки предоставленной информации.",
                 );
+                return true;
             } catch {
                 await ctx.reply("Произошла ошибка при отправке заявки. Попробуйте еще раз.");
+                return true;
             }
+
+        default:
+            return false;
     }
 }

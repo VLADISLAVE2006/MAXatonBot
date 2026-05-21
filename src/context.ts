@@ -7,7 +7,7 @@ export type FlowName = "registration";
 export type Step = "registration/consent" | "registration/name" | "registration/organizer_request";
 
 export type AppUser = User & {
-    role: Role;
+    role: Role | null | undefined;
 };
 
 export class AppContext extends Context {
@@ -16,7 +16,7 @@ export class AppContext extends Context {
         if (!user) return undefined;
 
         const session = getSession(user.user_id);
-        return { ...user, role: session.role ?? "applicant" };
+        return { ...user, role: session.role };
     }
 }
 

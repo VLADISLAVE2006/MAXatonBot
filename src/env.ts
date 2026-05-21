@@ -2,6 +2,8 @@ import z from "zod";
 
 const envSchema = z.object({
     BOT_TOKEN: z.string(),
+    API_KEY: z.string(),
+    API_URL: z.url(),
 });
 
 export type Env = z.infer<typeof envSchema>;

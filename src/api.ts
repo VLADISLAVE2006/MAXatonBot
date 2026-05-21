@@ -1,14 +1,15 @@
 import { $fetch } from "ofetch";
-import type { Role } from "./types/app";
+import type { Role } from "@/types/app";
+import { env } from "@/env";
 
 const _fetch = <T>(path: string, options?: RequestInit) => {
     const headers = new Headers(options?.headers);
 
     if (process.env.API_KEY) {
-        headers.set("X-API-Key", process.env.API_KEY);
+        headers.set("X-API-Key", env.API_KEY);
     }
 
-    return $fetch<T>(`${process.env.API_URL}${path}`, {
+    return $fetch<T>(`${env.API_URL}${path}`, {
         ...options,
         headers,
     });

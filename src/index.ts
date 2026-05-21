@@ -4,6 +4,7 @@ import { env } from "@/env";
 import { initFlows } from "@/flows";
 import { api } from "@/api";
 import { AppContext, getSession, setSession, setRole } from "@/context";
+import { initCommands } from "@/commands";
 
 const bot = new Bot<AppContext>(env.BOT_TOKEN!, { contextType: AppContext });
 
@@ -30,6 +31,7 @@ bot.use(async (ctx, next) => {
     await next();
 });
 
+initCommands(bot);
 initFlows(bot);
 
 bot.start();
