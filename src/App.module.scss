@@ -1,0 +1,145 @@
+.app {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #d4e8ff 0%, #b8d4f0 100%);
+  padding-top: 80px;
+  padding-left: 20px;
+  padding-right: 20px;
+  padding-bottom: 80px;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.topPanel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 0 0 30px 30px;
+  padding: 12px 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+}
+
+.panelWrapper {
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.searchWrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: #f0f6fe;
+  border-radius: 40px;
+  padding: 8px 16px;
+  gap: 8px;
+  border: 1px solid #cce3ff;
+
+  i {
+    color: #2c6e9e;
+    font-size: 14px;
+  }
+
+  input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    color: #1a3d5c;
+
+    &::placeholder {
+      color: #7a9bc2;
+    }
+  }
+}
+
+.counter {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a4972;
+  margin-bottom: 16px;
+  padding-left: 4px;
+  margin-top: 8px;
+}
+
+.eventsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modalWrapper {
+  max-width: 500px;
+  width: 90%;
+  max-height: 85vh;
+}
+
+@media (max-width: 768px) {
+  .app {
+    padding-top: 70px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .topPanel {
+    padding: 10px 16px;
+  }
+
+  .searchWrapper {
+    padding: 6px 12px;
+  }
+
+  .counter {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .app {
+    padding-top: 110px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .topPanel {
+    padding: 12px;
+  }
+
+  .panelWrapper {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .searchWrapper {
+    width: 100%;
+    padding: 8px 14px;
+  }
+
+  .counter {
+    font-size: 12px;
+  }
+}
