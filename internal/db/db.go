@@ -1,13 +1,14 @@
 package db
 
 import (
-    "database/sql"
-    "fmt"
-    "log"
-    "os"
+	"database/sql"
+	"fmt"
+	"log"
+	"os"
 
-    _ "github.com/lib/pq" // драйвер PostgreSQL
 	"strconv"
+
+	_ "github.com/lib/pq" // драйвер PostgreSQL
 )
 
 // DB - глобальный объект базы данных (можно использовать и без глобальной переменной, но для простоты)
@@ -15,31 +16,31 @@ var DB *sql.DB
 
 // InitDB устанавливает соединение с БД и создаёт таблицы, если их нет
 func InitDB() error {
-    // Формируем строку подключения
-    connStr := fmt.Sprintf(
-        "host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-        os.Getenv("DB_HOST"),
-        os.Getenv("DB_PORT"),
-        os.Getenv("DB_USER"),
-        os.Getenv("DB_PASSWORD"),
-        os.Getenv("DB_NAME"),
-    )
+	// Формируем строку подключения
+	connStr := fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		os.Getenv("DB_HOST"),
+		os.Getenv("DB_PORT"),
+		os.Getenv("DB_USER"),
+		os.Getenv("DB_PASSWORD"),
+		os.Getenv("DB_NAME"),
+	)
 
-    var err error
-    DB, err = sql.Open("postgres", connStr)
-    if err != nil {
-        return fmt.Errorf("failed to open db: %w", err)
-    }
+	var err error
+	DB, err = sql.Open("postgres", connStr)
+	if err != nil {
+		return fmt.Errorf("failed to open db: %w", err)
+	}
 
-    // Проверяем соединение
-    if err = DB.Ping(); err != nil {
-        return fmt.Errorf("cannot ping db: %w", err)
-    }
+	// Проверяем соединение
+	if err = DB.Ping(); err != nil {
+		return fmt.Errorf("cannot ping db: %w", err)
+	}
 
-    log.Println("Connected to PostgreSQL")
+	log.Println("Connected to PostgreSQL")
 
-    // Создаём таблицу users, если ещё не создана
-    createTableSQL := `
+	// Создаём таблицу users, если ещё не создана
+	createTableSQL := `
     CREATE TABLE IF NOT EXISTS users (
         user_id         BIGINT PRIMARY KEY,
         full_name       TEXT,
@@ -49,33 +50,47 @@ func InitDB() error {
         consent_version TEXT,
 		requested_organizer BOOLEAN DEFAULT FALSE
     );`
-    _, err = DB.Exec(createTableSQL)
-    if err != nil {
-        return fmt.Errorf("failed to create table: %w", err)
-    }
+	_, err = DB.Exec(createTableSQL)
+	if err != nil {
+		return fmt.Errorf("failed to create table: %w", err)
+	}
 
-    log.Println("Table 'users' is ready")
+	log.Println("Table 'users' is ready")
 
-	 if err := ensureAdmin(); err != nil {
-        log.Printf("Warning: could not ensure admin: %v", err)
-    }
-    return nil
+	createRequestsTableSQL := `
+    CREATE TABLE IF NOT EXISTS organizer_requests (
+        id          SERIAL PRIMARY KEY,
+        user_id     BIGINT REFERENCES users(user_id),
+        file_path   TEXT NOT NULL,
+        status      TEXT NOT NULL DEFAULT 'pending',
+        created_at  TIMESTAMP NOT NULL DEFAULT now()
+    );`
+	_, err = DB.Exec(createRequestsTableSQL)
+	if err != nil {
+		return fmt.Errorf("failed to create organizer_requests table: %w", err)
+	}
+
+	log.Println("Table 'organizer_requests' is ready")
+
+	if err := ensureAdmin(); err != nil {
+		log.Printf("Warning: could not ensure admin: %v", err)
+	}
+	return nil
 }
-
 
 // создаем админа при первом запуске таблиццы
 func ensureAdmin() error {
-    adminIDStr := os.Getenv("ADMIN_USER_ID")
-    if adminIDStr == "" {
-        log.Println("ADMIN_USER_ID not set, skipping admin initialization")
-        return nil
-    }
-    adminID, err := strconv.ParseInt(adminIDStr, 10, 64)
-    if err != nil {
-        return fmt.Errorf("invalid ADMIN_USER_ID: %w", err)
-    }
+	adminIDStr := os.Getenv("ADMIN_USER_ID")
+	if adminIDStr == "" {
+		log.Println("ADMIN_USER_ID not set, skipping admin initialization")
+		return nil
+	}
+	adminID, err := strconv.ParseInt(adminIDStr, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid ADMIN_USER_ID: %w", err)
+	}
 
-    _, err = DB.Exec(`
+	_, err = DB.Exec(`
         INSERT INTO users (user_id, role, consent_given, full_name, consent_date, consent_version)
         VALUES ($1, 'admin', true, 'Administrator', NOW(), '1.0')
         ON CONFLICT (user_id) DO UPDATE SET
@@ -83,5 +98,5 @@ func ensureAdmin() error {
             consent_given = true,
             consent_date = NOW()
     `, adminID)
-    return err
+	return err
 }
