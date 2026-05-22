@@ -1,16 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import styles from './OrganizerApp.module.scss';
-import EventCard from './components/EventCard';
-import FilterPanel from './components/FilterPanel';
-import EventModalOrganizer from './components/EventModalOrganizer';
-import CreateEventModal from './components/CreateEventModal';
-import { loadAllEvents, saveAllEvents, addEvent, updateEvent, deleteEvent } from './data/eventsData';
+import React, { useState, useEffect } from "react";
+import styles from "./OrganizerApp.module.scss";
+import EventCard from "./components/EventCard";
+import FilterPanel from "./components/FilterPanel";
+import EventModalOrganizer from "./components/EventModalOrganizer";
+import CreateEventModal from "./components/CreateEventModal";
+import {
+  loadAllEvents,
+  saveAllEvents,
+  addEvent,
+  updateEvent,
+  deleteEvent,
+} from "./data/eventsData";
 
 const ORGANIZER_ID = 1;
 
 function OrganizerApp() {
   const [allEvents, setAllEvents] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState({
     format: [],
     type: [],
@@ -21,15 +27,15 @@ function OrganizerApp() {
 
   useEffect(() => {
     loadEvents();
-    
+
     const handleStorageChange = (e) => {
-      if (e.key === 'all_events') {
+      if (e.key === "all_events") {
         loadEvents();
       }
     };
-    
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
   const loadEvents = () => {
@@ -37,7 +43,9 @@ function OrganizerApp() {
     setAllEvents(events);
   };
 
-  const myEvents = allEvents.filter(event => event.organizerId === ORGANIZER_ID);
+  const myEvents = allEvents.filter(
+    (event) => event.organizerId === ORGANIZER_ID,
+  );
 
   const filteredEvents = myEvents.filter((event) => {
     const matchesSearch = event.title
@@ -59,9 +67,12 @@ function OrganizerApp() {
       id: Date.now(),
       organizerId: ORGANIZER_ID,
       remainingSeats: newEventData.totalSeats,
-      imageUrl: imageBase64 || newEventData.imageUrl || 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&h=500&fit=crop',
+      imageUrl:
+        imageBase64 ||
+        newEventData.imageUrl ||
+        "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&h=500&fit=crop",
     };
-    
+
     const updatedEvents = addEvent(newEvent);
     setAllEvents(updatedEvents);
     setIsCreateModalOpen(false);
@@ -73,7 +84,7 @@ function OrganizerApp() {
       imageUrl: imageBase64 || updatedEventData.imageUrl,
       remainingSeats: updatedEventData.totalSeats,
     };
-    
+
     const updatedEvents = updateEvent(updatedEvent);
     setAllEvents(updatedEvents);
     setEditingEvent(null);
@@ -81,7 +92,7 @@ function OrganizerApp() {
   };
 
   const handleDeleteEvent = (eventId) => {
-    if (window.confirm('Вы уверены, что хотите удалить это мероприятие?')) {
+    if (window.confirm("Вы уверены, что хотите удалить это мероприятие?")) {
       const updatedEvents = deleteEvent(eventId);
       setAllEvents(updatedEvents);
       setSelectedEvent(null);
@@ -108,7 +119,10 @@ function OrganizerApp() {
           </div>
           <div className={styles.buttonGroup}>
             <FilterPanel filters={filters} setFilters={setFilters} />
-            <button className={styles.createBtn} onClick={() => setIsCreateModalOpen(true)}>
+            <button
+              className={styles.createBtn}
+              onClick={() => setIsCreateModalOpen(true)}
+            >
               <i className="fas fa-plus"></i>
               <span>Создать</span>
             </button>
@@ -133,10 +147,16 @@ function OrganizerApp() {
       </div>
 
       {selectedEvent && (
-        <div className={styles.modalOverlay} onClick={() => setSelectedEvent(null)}>
-          <div className={styles.modalWrapper} onClick={(e) => e.stopPropagation()}>
-            <EventModalOrganizer 
-              event={selectedEvent} 
+        <div
+          className={styles.modalOverlay}
+          onClick={() => setSelectedEvent(null)}
+        >
+          <div
+            className={styles.modalWrapper}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <EventModalOrganizer
+              event={selectedEvent}
               onClose={() => setSelectedEvent(null)}
               onEdit={() => openEditModal(selectedEvent)}
               onDelete={() => handleDeleteEvent(selectedEvent.id)}
@@ -146,11 +166,17 @@ function OrganizerApp() {
       )}
 
       {(isCreateModalOpen || editingEvent) && (
-        <div className={styles.modalOverlay} onClick={() => {
-          setIsCreateModalOpen(false);
-          setEditingEvent(null);
-        }}>
-          <div className={styles.modalWrapperLarge} onClick={(e) => e.stopPropagation()}>
+        <div
+          className={styles.modalOverlay}
+          onClick={() => {
+            setIsCreateModalOpen(false);
+            setEditingEvent(null);
+          }}
+        >
+          <div
+            className={styles.modalWrapperLarge}
+            onClick={(e) => e.stopPropagation()}
+          >
             <CreateEventModal
               event={editingEvent}
               onClose={() => {
