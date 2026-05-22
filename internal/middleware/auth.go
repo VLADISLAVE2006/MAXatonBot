@@ -113,6 +113,35 @@ func UserAuth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+func OrganizerAuth(next http.HandlerFunc) http.HandlerFunc {
+	expectedKey := os.Getenv("API_KEY")
+	return func(w http.ResponseWriter, r *http.Request) {
+		if key := r.Header.Get("X-API-Key"); key == "" || key != expectedKey {
+			writeAuthError(w, http.StatusUnauthorized, "invalid or missing API key")
+			return
+		}
+
+		tokenStr, ok := extractBearer(r)
+		if !ok {
+			writeAuthError(w, http.StatusUnauthorized, "missing Bearer token")
+			return
+		}
+
+		claims, err := ParseToken(tokenStr)
+		if err != nil {
+			writeAuthError(w, http.StatusUnauthorized, "invalid or expired token")
+			return
+		}
+		if claims.Role != "organizer" {
+			writeAuthError(w, http.StatusForbidden, "forbidden: organizer only")
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), ClaimsKey, claims)
+		next(w, r.WithContext(ctx))
+	}
+}
+
 func AdminAuth(next http.HandlerFunc) http.HandlerFunc {
 	expectedKey := os.Getenv("API_KEY")
 	return func(w http.ResponseWriter, r *http.Request) {

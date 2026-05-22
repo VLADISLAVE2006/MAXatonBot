@@ -38,6 +38,10 @@ func main() {
 	router.HandleFunc("/api/admin/organizer-requests", middleware.AdminAuth(handlers.HandleOrganizerRequests)).Methods("GET")
 	router.HandleFunc("/api/admin/organizer-requests/{id}", middleware.AdminAuth(handlers.HandleOrganizerRequestByID)).Methods("GET")
 
+	router.HandleFunc("/api/events", middleware.UserAuth(handlers.HandleGetEvents)).Methods("GET")
+	router.HandleFunc("/api/events/{id}", middleware.UserAuth(handlers.HandleGetEventByID)).Methods("GET")
+	router.HandleFunc("/api/events", middleware.OrganizerAuth(handlers.HandleCreateEvent)).Methods("POST")
+
 	uploadsDir := "./uploads"
 	router.PathPrefix("/uploads/").Handler(
 		middleware.AdminAuth(func(w http.ResponseWriter, r *http.Request) {

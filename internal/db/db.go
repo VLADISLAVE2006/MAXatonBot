@@ -72,6 +72,27 @@ func InitDB() error {
 
 	log.Println("Table 'organizer_requests' is ready")
 
+	createEventsTableSQL := `
+	CREATE TABLE IF NOT EXISTS events (
+		id                 SERIAL PRIMARY KEY,
+		title              VARCHAR NOT NULL,
+		description        VARCHAR NOT NULL,
+		content            TEXT NOT NULL,
+		max_slots          INT,
+		cancellation_rules TEXT,
+		date               TIMESTAMP NOT NULL,
+		format             VARCHAR NOT NULL,
+		type               VARCHAR NOT NULL,
+		created_by         BIGINT NOT NULL REFERENCES users(user_id),
+		created_at         TIMESTAMP NOT NULL DEFAULT now(),
+		updated_at         TIMESTAMP NOT NULL DEFAULT now()
+	);`
+	_, err = DB.Exec(createEventsTableSQL)
+	if err != nil {
+		return fmt.Errorf("failed to create events table: %w", err)
+	}
+	log.Println("Table 'events' is ready")
+
 	if err := ensureAdmin(); err != nil {
 		log.Printf("Warning: could not ensure admin: %v", err)
 	}
