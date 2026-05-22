@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"strconv"
 
@@ -81,6 +82,7 @@ func InitDB() error {
 	if err := ensureAdmin(); err != nil {
 		log.Printf("Warning: could not ensure admin: %v", err)
 	}
+
 	return nil
 }
 
@@ -105,4 +107,41 @@ func ensureAdmin() error {
             consent_date = NOW()
     `, adminID)
 	return err
+}
+
+func ensureOrganizers() error {
+	organizersStr := os.Getenv("ORGANIZER_USER_IDS")
+	if organizersStr == "" {
+		log.Println("ORGANIZER_USER_IDS not set, skipping organizers initialization")
+		return nil
+	}
+
+	ids := strings.Split(organizersStr, ",")
+	for _, idStr := range ids {
+		idStr = strings.TrimSpace(idStr)
+		if idStr == "" {
+			continue
+		}
+
+		userID, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			log.Printf("Warning: invalid organizer ID '%s': %v", idStr, err)
+			continue
+		}
+
+		_, err = DB.Exec(`
+			INSERT INTO users (user_id, role, consent_given, full_name, consent_date, consent_version)
+			VALUES ($1, 'organizer', true, 'Organizer', NOW(), '1.0')
+			ON CONFLICT (user_id) DO UPDATE SET
+				role = 'organizer',
+				consent_given = true,
+				consent_date = NOW()
+		`, userID)
+		if err != nil {
+			log.Printf("Warning: failed to ensure organizer %d: %v", userID, err)
+			continue
+		}
+		log.Printf("Ensured organizer user_id=%d", userID)
+	}
+	return nil
 }
