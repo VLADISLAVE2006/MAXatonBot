@@ -87,4 +87,47 @@ export const api = {
                 token,
             }),
     },
+    events: {
+        getEvents: (token: string) =>
+            _fetch<{ id: number; title: string; description: string; date: number }[]>("/api/events", {
+                method: "GET",
+                token,
+            }),
+        getEventById: (id: number, token: string) =>
+            _fetch<{
+                id: number;
+                title: string;
+                description: string;
+                content: string;
+                max_slots: number;
+                cancellation_rules: string;
+                date: number;
+                format: string;
+                type: string;
+                created_at: number;
+                updated_at: number;
+            }>(`/api/events/${id}`, {
+                method: "GET",
+                token,
+            }),
+        createEvent: (
+            data: {
+                title: string;
+                description: string;
+                content: string;
+                max_slots: number;
+                cancellation_rules: string;
+                date: number;
+                format: string;
+                type: string;
+            },
+            token: string,
+        ) =>
+            _fetch("/api/events", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+                token,
+            }),
+    },
 };

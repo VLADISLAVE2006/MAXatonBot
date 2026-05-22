@@ -5,6 +5,7 @@ const envSchema = z.object({
     ADMIN_ID: z.coerce.number(),
     API_KEY: z.string(),
     API_URL: z.url(),
+    CATALOG_URL: z.url(),
 });
 
 export type Env = z.infer<typeof envSchema>;
