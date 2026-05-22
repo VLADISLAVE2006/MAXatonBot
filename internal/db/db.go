@@ -57,21 +57,6 @@ func InitDB() error {
 
 	log.Println("Table 'users' is ready")
 
-	createRequestsTableSQL := `
-    CREATE TABLE IF NOT EXISTS organizer_requests (
-        id          SERIAL PRIMARY KEY,
-        user_id     BIGINT REFERENCES users(user_id),
-        file_path   TEXT NOT NULL,
-        status      TEXT NOT NULL DEFAULT 'pending',
-        created_at  TIMESTAMP NOT NULL DEFAULT now()
-    );`
-	_, err = DB.Exec(createRequestsTableSQL)
-	if err != nil {
-		return fmt.Errorf("failed to create organizer_requests table: %w", err)
-	}
-
-	log.Println("Table 'organizer_requests' is ready")
-
 	createEventsTableSQL := `
 	CREATE TABLE IF NOT EXISTS events (
 		id                 SERIAL PRIMARY KEY,
