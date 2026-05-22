@@ -25,12 +25,14 @@ export interface Session {
     step: Step | null;
     data: Record<string, unknown>;
     role: Role | undefined | null;
+    token: string | null;
+    fullName?: string;
 }
 
 export const sessions = new Map<number, Session>();
 
 export function getSession(userId: number): Session {
-    return sessions.get(userId) ?? { flow: null, step: null, data: {}, role: undefined };
+    return sessions.get(userId) ?? { flow: null, step: null, data: {}, role: undefined, token: null };
 }
 
 export function setSession(userId: number, s: Session) {
@@ -39,25 +41,40 @@ export function setSession(userId: number, s: Session) {
 
 export function setStep(userId: number, step: Step) {
     const s = getSession(userId);
-    sessions.set(userId, { flow: s.flow, step, data: s.data, role: s.role });
+    sessions.set(userId, { ...s, step });
+}
+
+export function setFlow(userId: number, flow: FlowName) {
+    const s = getSession(userId);
+    sessions.set(userId, { ...s, flow });
 }
 
 export function mergeData(userId: number, patch: Record<string, unknown>) {
     const s = getSession(userId);
-    sessions.set(userId, {
-        flow: s.flow,
-        step: s.step,
-        data: { ...s.data, ...patch },
-        role: s.role,
-    });
+    sessions.set(userId, { ...s, data: { ...s.data, ...patch } });
 }
 
 export function setRole(userId: number, role: Role) {
     const s = getSession(userId);
-    sessions.set(userId, { flow: s.flow, step: s.step, data: s.data, role });
+    sessions.set(userId, { ...s, role });
+}
+
+export function setToken(userId: number, token: string) {
+    const s = getSession(userId);
+    sessions.set(userId, { ...s, token });
+}
+
+export function getToken(userId: number): string | null {
+    const s = getSession(userId);
+    return s.token;
+}
+
+export function setFullName(userId: number, fullName: string) {
+    const s = getSession(userId);
+    sessions.set(userId, { ...s, fullName });
 }
 
 export function resetSession(userId: number) {
     const s = getSession(userId);
-    sessions.set(userId, { flow: null, step: null, data: {}, role: s.role });
+    sessions.set(userId, { flow: null, step: null, data: {}, role: s.role, token: s.token });
 }

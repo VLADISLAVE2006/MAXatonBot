@@ -1,21 +1,15 @@
-import type { AppContext } from "@/context";
+import { api } from "@/api";
+import { getToken, type AppContext } from "@/context";
 import { Keyboard } from "@maxhub/max-bot-api";
-
-const requests = [
-    { id: 1, name: "Влад Иванов" },
-    { id: 2, name: "Анна Петрова" },
-    { id: 3, name: "Сергей Сидоров" },
-    { id: 4, name: "Елена Кузнецова" },
-    { id: 5, name: "Дмитрий Смирнов" },
-    { id: 6, name: "Ольга Попова" },
-    { id: 7, name: "Алексей Васильев" },
-]; // TODO запрос на бэкенд
 
 export async function organizerRequestsCommand(ctx: AppContext) {
     const userId = ctx.user?.user_id;
     if (!userId) return;
 
+    const token = getToken(userId);
+
     try {
+        const requests = await api.admin.getOrganizerRequests(token!);
         const rows: any[] = [];
         for (let i = 0; i < requests.length; i += 3) {
             const slice = requests
@@ -25,7 +19,7 @@ export async function organizerRequestsCommand(ctx: AppContext) {
         }
 
         await ctx.reply(
-            `Заявки на статус организатора:\n${requests.map((req, i) => `${i + 1}. ${req.name}`).join("\n")}`,
+            `Заявки на статус организатора:\n${requests.map((req, i) => `${i + 1}. ${req.full_name}`).join("\n")}`,
             {
                 attachments: [Keyboard.inlineKeyboard(rows)],
             },
@@ -37,15 +31,37 @@ export async function handleOrganizerRequestCallback(ctx: AppContext): Promise<b
     const payload = ctx.callback?.payload;
     if (!payload?.startsWith("organizer_request:")) return false;
 
+    const userId = ctx.user?.user_id;
+    if (!userId) return false;
+
     const requestId = Number(payload.split(":")[1]);
     if (!Number.isFinite(requestId)) return false;
 
-    const request = requests.find((item) => item.id === requestId);
-    if (!request) {
-        await ctx.reply("Заявка не найдена.");
-        return true;
+    const token = getToken(userId);
+
+    try {
+        const request = await api.admin.getOrganizerRequestById(requestId, token!);
+        const file = await ctx.api.uploadFile({
+            source: request.file_url,
+        });
+        await ctx.reply(
+            [
+                `Заявка #${request.id}`,
+                `Имя: ${request.full_name}`,
+                `Дата: ${new Date(request.created_at).toLocaleString("ru")}`,
+            ].join("\n"),
+            {
+                attachments: [
+                    {
+                        type: "file",
+                        payload: file,
+                    },
+                ],
+            },
+        );
+    } catch {
+        await ctx.reply("Заявка не найдена");
     }
 
-    await ctx.reply([`Заявка #${request.id}`, request.name].join("\n"));
     return true;
 }

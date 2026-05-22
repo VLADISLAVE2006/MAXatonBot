@@ -1,7 +1,19 @@
 import { Keyboard } from "@maxhub/max-bot-api";
-import { getSession, setSession, setStep, mergeData, resetSession, type AppContext } from "@/context";
+import {
+    getSession,
+    setSession,
+    setStep,
+    mergeData,
+    resetSession,
+    type AppContext,
+    getToken,
+    setToken,
+    setRole,
+    setFlow,
+} from "@/context";
 import { api } from "@/api";
 import { fileDownload } from "@/utils/file-download";
+import { env } from "@/env";
 
 const ConsentKeyboard = Keyboard.inlineKeyboard([
     [
@@ -20,6 +32,7 @@ export function startRegistration(ctx: AppContext) {
         step: "registration/consent",
         data: {},
         role: null,
+        token: null,
     });
 
     ctx.reply(
@@ -42,6 +55,7 @@ export async function handleRegistrationCallback(ctx: AppContext): Promise<boole
 
     if (callbackPayload === "request_organizer") {
         try {
+            setFlow(userId, "registration");
             setStep(userId, "registration/organizer_request");
             await ctx.reply("Для подтверждения статуса организатора укажите ваш ИНН");
             return true;
@@ -60,6 +74,10 @@ export async function handleRegistrationCallback(ctx: AppContext): Promise<boole
             if (session.step !== "registration/consent") return false;
             try {
                 await api.user.consent(userId, true, "1.0");
+                const userInfo = await api.user.me(userId);
+                setRole(userId, userInfo.role);
+                setToken(userId, userInfo.token);
+
                 mergeData(userId, { consentGiven: true });
                 setStep(userId, "registration/name");
                 await ctx.reply("Как Вас зовут? Введите имя и фамилию в формате: Имя Фамилия");
@@ -77,6 +95,7 @@ export async function handleRegistrationCallback(ctx: AppContext): Promise<boole
                 step: "registration/consent",
                 data: {},
                 role: ctx.user.role,
+                token: getToken(userId),
             });
             await ctx.reply("К сожалению, без разрешения на обработку персональных данных я не смогу помочь вам.", {
                 attachments: [ConsentKeyboard],
@@ -105,7 +124,8 @@ export async function handleRegistrationMessage(ctx: AppContext): Promise<boolea
                 return true;
             }
             try {
-                await api.user.profile(userId, text);
+                const token = getToken(userId);
+                await api.user.profile(text, token!);
                 mergeData(userId, { name: text });
                 resetSession(userId);
                 await ctx.reply(`✅ Спасибо, ${text.split(" ")[0]}! Вы успешно зарегистрированы.`, {
@@ -114,12 +134,13 @@ export async function handleRegistrationMessage(ctx: AppContext): Promise<boolea
                     ],
                 });
                 return true;
-            } catch {
+            } catch (error) {
                 await ctx.reply("Произошла ошибка. Попробуйте еще раз.");
                 return true;
             }
 
         case "registration/organizer_request":
+            console.log("Handling organizer request", { userId, session });
             const file = ctx.message?.body.attachments?.find((a) => a.type === "file");
             if (!file) {
                 await ctx.reply("Пожалуйста, отправьте фотографию вашего ИНН в виде файла.");
@@ -127,17 +148,29 @@ export async function handleRegistrationMessage(ctx: AppContext): Promise<boolea
             }
 
             const fileBuffer = await fileDownload(file.payload.url);
-
-            // TODO отправить файл на бэкенд для проверки
-
+            const token = getToken(userId);
             try {
-                await api.user.requestOrganizer(userId);
+                await api.user.requestOrganizer(fileBuffer, token!);
                 resetSession(userId);
                 await ctx.reply(
                     "✅ Ваша заявка на статус организатора успешно отправлена! Мы свяжемся с вами после проверки предоставленной информации.",
                 );
+                await ctx.api.sendMessageToUser(
+                    env.ADMIN_ID,
+                    `Пользователь @${ctx.user?.username} (${ctx.user?.user_id}) отправил заявку на статус организатора.`,
+                    {
+                        attachments: [
+                            // file,
+                            Keyboard.inlineKeyboard([
+                                [Keyboard.button.callback("Рассмотреть заявку", `organizer_request:${userId}`)],
+                            ]),
+                        ],
+                    },
+                );
+
                 return true;
-            } catch {
+            } catch (error) {
+                console.error("Error in organizer request:", error);
                 await ctx.reply("Произошла ошибка при отправке заявки. Попробуйте еще раз.");
                 return true;
             }

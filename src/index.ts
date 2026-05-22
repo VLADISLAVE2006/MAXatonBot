@@ -3,7 +3,7 @@ import "dotenv/config";
 import { env } from "@/env";
 import { initFlows } from "@/flows";
 import { api } from "@/api";
-import { AppContext, getSession, setSession, setRole } from "@/context";
+import { AppContext, getSession, setSession, setRole, setToken, setFullName, setStep } from "@/context";
 import { initCommands } from "@/commands";
 
 const bot = new Bot<AppContext>(env.BOT_TOKEN!, { contextType: AppContext });
@@ -16,14 +16,21 @@ bot.use(async (ctx, next) => {
 
     if (session.role === undefined) {
         try {
-            const userInfo = await api.user.role(ctx.user.user_id);
+            const userInfo = await api.user.me(ctx.user.user_id);
             setRole(ctx.user.user_id, userInfo.role);
+            setToken(ctx.user.user_id, userInfo.token);
+            setFullName(ctx.user.user_id, userInfo.full_name);
+
+            if (!userInfo.full_name) {
+                setStep(ctx.user.user_id, "registration/name");
+            }
         } catch (error) {
             setSession(ctx.user.user_id, {
                 flow: "registration",
                 step: "registration/consent",
                 data: {},
                 role: null,
+                token: null,
             });
         }
     }

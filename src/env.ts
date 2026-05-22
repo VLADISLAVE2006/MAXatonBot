@@ -2,6 +2,7 @@ import z from "zod";
 
 const envSchema = z.object({
     BOT_TOKEN: z.string(),
+    ADMIN_ID: z.coerce.number(),
     API_KEY: z.string(),
     API_URL: z.url(),
 });
