@@ -4,7 +4,7 @@ import type { Bot } from "@maxhub/max-bot-api";
 import { startRegistration } from "@/flows/registration";
 import { api } from "@/api";
 import { eventsCommand, handleEventsCallback } from "./events";
-import { myEventsCommand } from "./my_events";
+import { myEventsCommand, handleMyEventsCallback, handleCancelRegistrationCallback } from "./my_events";
 
 export type CallbackHandler = (ctx: AppContext) => boolean | Promise<boolean>;
 
@@ -28,5 +28,5 @@ export function initCommands(bot: Bot<AppContext>) {
 }
 
 export function collectCommandCallbackHandlers(): CallbackHandler[] {
-    return [handleEventsCallback];
+    return [handleEventsCallback, handleMyEventsCallback, handleCancelRegistrationCallback];
 }

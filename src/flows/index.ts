@@ -3,6 +3,7 @@ import { helpCommand } from "@/commands/help";
 import { collectCommandCallbackHandlers } from "@/commands";
 import { getSession, type AppContext } from "@/context";
 import { handleRegistrationCallback, handleRegistrationMessage, startRegistration } from "./registration";
+import { handleRegisterDeeplink } from "@/commands/register";
 
 type FlowRouter = {
     onBotStarted?: (ctx: AppContext) => void | Promise<void>;
@@ -20,6 +21,8 @@ const flows: FlowRouter[] = [
 
 export function initFlows(bot: Bot<AppContext>) {
     bot.on("bot_started", async (ctx: AppContext) => {
+        if (await handleRegisterDeeplink(ctx)) return;
+
         for (const flow of flows) {
             await flow.onBotStarted?.(ctx);
         }

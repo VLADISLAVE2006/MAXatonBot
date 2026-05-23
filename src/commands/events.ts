@@ -37,7 +37,12 @@ export async function eventsCommand(ctx: AppContext) {
 
         const list = upcoming.length > 0 ? upcoming : events.slice(0, 9);
 
-        const lines = list.map((e, i) => `${i + 1}. ${e.title} — ${formatDate(e.date)}`).join("\n");
+        const lines = list.map((e, i) => {
+            const seats = e.max_slots != null
+                ? ` (${e.max_slots - e.registered_count}/${e.max_slots} мест)`
+                : "";
+            return `${i + 1}. ${e.title} — ${formatDate(e.date)}${seats}`;
+        }).join("\n");
 
         const numberButtons = list.map((e, i) => Keyboard.button.callback(`${i + 1}`, `event:${e.id}`));
 
