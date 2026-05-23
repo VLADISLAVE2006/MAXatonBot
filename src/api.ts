@@ -93,6 +93,11 @@ export const api = {
                 method: "GET",
                 token,
             }),
+        getOrganizerEvents: (token: string) =>
+            _fetch<{ id: number; title: string; description: string; date: number }[]>("/api/organizer/events", {
+                method: "GET",
+                token,
+            }),
         getEventById: (id: number, token: string) =>
             _fetch<{
                 id: number;
