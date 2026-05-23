@@ -21,7 +21,7 @@ const _fetch = async (path: string, options?: RequestInit) => {
 
 export const api = {
   events: {
-    getAll: (): Promise<{ id: number; title: string; description: string; date: number }[]> =>
+    getAll: (): Promise<{ id: number; title: string; description: string; date: number; max_slots: number | null; registered_count: number }[]> =>
       _fetch("/api/events"),
 
     getById: (id: number): Promise<{
@@ -37,9 +37,10 @@ export const api = {
       created_by: number;
       created_at: number;
       updated_at: number;
+      registered_count: number;
     }> => _fetch(`/api/events/${id}`),
 
-    getMyEvents: (): Promise<{ id: number; title: string; description: string; date: number }[]> =>
+    getMyEvents: (): Promise<{ id: number; title: string; description: string; date: number; registered_count: number }[]> =>
       _fetch("/api/organizer/events"),
 
     create: (data: {

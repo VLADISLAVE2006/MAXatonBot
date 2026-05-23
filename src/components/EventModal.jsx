@@ -2,7 +2,7 @@ import React from "react";
 
 const EventModal = ({ event, onClose }) => {
   const handleRegister = () => {
-    window.location.href = `https://max.ru/${import.meta.env.VITE_BOT_USERNAME}?startapp=register_${event.id}`;
+    window.location.href = `https://max.ru/${import.meta.env.VITE_BOT_USERNAME}?start=register_${event.id}`;
   };
 
   const styles = {
@@ -172,23 +172,22 @@ const EventModal = ({ event, onClose }) => {
               <div style={styles.detailItem}>
                 <span style={styles.detailIcon}>👥</span>
                 <span>
-                  <strong>Всего мест:</strong> {event.totalSeats}
-                </span>
-              </div>
-
-              <div style={styles.detailItem}>
-                <span style={styles.detailIcon}>💺</span>
-                <span>
-                  <strong>Осталось мест:</strong>{" "}
-                  <span
-                    style={
-                      event.remainingSeats <= 5
-                        ? styles.lowSeats
-                        : styles.normalSeats
-                    }
-                  >
-                    {event.remainingSeats}
-                  </span>
+                  <strong>Места:</strong>{" "}
+                  {event.totalSeats != null ? (
+                    <span
+                      style={
+                        event.remainingSeats <= 0
+                          ? styles.lowSeats
+                          : event.remainingSeats <= 5
+                          ? styles.lowSeats
+                          : styles.normalSeats
+                      }
+                    >
+                      {event.remainingSeats}/{event.totalSeats}
+                    </span>
+                  ) : (
+                    <span style={styles.normalSeats}>∞</span>
+                  )}
                 </span>
               </div>
 

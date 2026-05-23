@@ -36,8 +36,17 @@ function OrganizerApp() {
         ...full,
         location: full.content,
         totalSeats: full.max_slots,
-        remainingSeats: full.max_slots,
-        dateTime: full.date * 1000,
+        remainingSeats:
+          full.max_slots != null
+            ? full.max_slots - full.registered_count
+            : null,
+        dateTime: new Date(full.date * 1000).toLocaleDateString("ru-RU", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
       });
     } catch (err) {
       console.error("Failed to load event:", err);
