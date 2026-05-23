@@ -48,8 +48,7 @@ func InitDB() error {
         role            TEXT NOT NULL DEFAULT 'applicant',
         consent_given   BOOLEAN NOT NULL DEFAULT false,
         consent_date    TIMESTAMP WITH TIME ZONE,
-        consent_version TEXT,
-		requested_organizer BOOLEAN DEFAULT FALSE
+        consent_version TEXT
     );`
 	_, err = DB.Exec(createTableSQL)
 	if err != nil {

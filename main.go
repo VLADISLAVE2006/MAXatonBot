@@ -32,15 +32,19 @@ func main() {
 	router.HandleFunc("/api/user/consent", middleware.APIAuth(handlers.HandleConsent)).Methods("POST")
 	router.HandleFunc("/api/user/profile", middleware.UserAuth(handlers.HandleProfile)).Methods("POST")
 	router.HandleFunc("/api/user/me", middleware.APIAuth(handlers.HandleGetMe)).Methods("GET")
-	router.HandleFunc("/api/user/request-organizer", middleware.UserAuth(handlers.HandleRequestOrganizer)).Methods("POST")
 
-	router.HandleFunc("/api/admin/set-role", middleware.AdminAuth(handlers.HandleSetRole)).Methods("POST")
+	router.HandleFunc("/api/admin/organizers", middleware.AdminAuth(handlers.HandleAdminCreateOrganizer)).Methods("POST")
 
 	router.HandleFunc("/api/events", middleware.UserAuth(handlers.HandleGetEvents)).Methods("GET")
 	router.HandleFunc("/api/events/{id}", middleware.UserAuth(handlers.HandleGetEventByID)).Methods("GET")
 	router.HandleFunc("/api/events", middleware.OrganizerAuth(handlers.HandleCreateEvent)).Methods("POST")
 
-	// Дополнительно: публичный эндпоинт для проверки работоспособности (без ключа)
+	router.HandleFunc("/api/organizer/events", middleware.OrganizerAuth(handlers.HandleGetOrganizerEvents)).Methods("GET")
+
+	router.HandleFunc("/api/events/{id}", middleware.OrganizerAuth(handlers.HandleUpdateEvent)).Methods("PUT")
+	router.HandleFunc("/api/events/{id}", middleware.OrganizerAuth(handlers.HandleDeleteEvent)).Methods("DELETE")
+
+	// Публичный эндпоинт для проверки работоспособности (без ключа)
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
