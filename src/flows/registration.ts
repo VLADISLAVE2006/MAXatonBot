@@ -12,8 +12,6 @@ import {
     setFlow,
 } from "@/context";
 import { api } from "@/api";
-import { fileDownload } from "@/utils/file-download";
-import { env } from "@/env";
 
 const ConsentKeyboard = Keyboard.inlineKeyboard([
     [
@@ -128,50 +126,10 @@ export async function handleRegistrationMessage(ctx: AppContext): Promise<boolea
                 await api.user.profile(text, token!);
                 mergeData(userId, { name: text });
                 resetSession(userId);
-                await ctx.reply(`✅ Спасибо, ${text.split(" ")[0]}! Вы успешно зарегистрированы.`, {
-                    attachments: [
-                        Keyboard.inlineKeyboard([[Keyboard.button.callback("Я организатор", "request_organizer")]]),
-                    ],
-                });
+                await ctx.reply(`✅ Спасибо, ${text.split(" ")[0]}! Вы успешно зарегистрированы.`);
                 return true;
             } catch (error) {
                 await ctx.reply("Произошла ошибка. Попробуйте еще раз.");
-                return true;
-            }
-
-        case "registration/organizer_request":
-            console.log("Handling organizer request", { userId, session });
-            const file = ctx.message?.body.attachments?.find((a) => a.type === "file");
-            if (!file) {
-                await ctx.reply("Пожалуйста, отправьте фотографию вашего ИНН в виде файла.");
-                return true;
-            }
-
-            const fileBuffer = await fileDownload(file.payload.url);
-            const token = getToken(userId);
-            try {
-                await api.user.requestOrganizer(fileBuffer, token!);
-                resetSession(userId);
-                await ctx.reply(
-                    "✅ Ваша заявка на статус организатора успешно отправлена! Мы свяжемся с вами после проверки предоставленной информации.",
-                );
-                await ctx.api.sendMessageToUser(
-                    env.ADMIN_ID,
-                    `Пользователь @${ctx.user?.username} (${ctx.user?.user_id}) отправил заявку на статус организатора.`,
-                    {
-                        attachments: [
-                            // file,
-                            Keyboard.inlineKeyboard([
-                                [Keyboard.button.callback("Рассмотреть заявку", `organizer_request:${userId}`)],
-                            ]),
-                        ],
-                    },
-                );
-
-                return true;
-            } catch (error) {
-                console.error("Error in organizer request:", error);
-                await ctx.reply("Произошла ошибка при отправке заявки. Попробуйте еще раз.");
                 return true;
             }
 

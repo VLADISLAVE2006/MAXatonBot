@@ -2,18 +2,17 @@ import { helpCommand } from "@/commands/help";
 import { setRole, setToken, type AppContext } from "@/context";
 import type { Bot } from "@maxhub/max-bot-api";
 import { startRegistration } from "@/flows/registration";
-import { handleOrganizerRequestCallback } from "./organizer_requests";
-import { organizerRequestsCommand } from "./organizer_requests";
 import { api } from "@/api";
 import { eventsCommand } from "./events";
+import { myEventsCommand } from "./my_events";
 
 export type CallbackHandler = (ctx: AppContext) => boolean | Promise<boolean>;
 
 export function initCommands(bot: Bot<AppContext>) {
     bot.command("help", helpCommand);
     bot.command("start", startRegistration); // TODO удалить после тестов
-    bot.command("organizer_requests", organizerRequestsCommand);
     bot.command("events", eventsCommand);
+    bot.command("my_events", myEventsCommand);
     // TODO удалить после тестов
     bot.command("refresh", async (ctx) => {
         try {
@@ -29,5 +28,5 @@ export function initCommands(bot: Bot<AppContext>) {
 }
 
 export function collectCommandCallbackHandlers(): CallbackHandler[] {
-    return [handleOrganizerRequestCallback];
+    return [];
 }

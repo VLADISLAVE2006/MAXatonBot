@@ -9,6 +9,7 @@ import { initCommands } from "@/commands";
 const bot = new Bot<AppContext>(env.BOT_TOKEN!, { contextType: AppContext });
 
 bot.use(async (ctx, next) => {
+    console.log(`Received update of type ${ctx.updateType} from user ${ctx.user?.user_id}`);
     if (ctx.updateType !== "message_created") return await next();
     if (!ctx.user) return await next();
 

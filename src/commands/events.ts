@@ -7,14 +7,13 @@ export async function eventsCommand(ctx: AppContext) {
     if (!ctx.user) return;
     const token = getToken(ctx.user.user_id);
     try {
-        const events = await api.events.getEvents(token!);
-        console.log(env.CATALOG_URL);
-        await ctx.reply(
-            `Список мероприятий:\n${events.map((e) => `- ${e.title} (${new Date(e.date).toLocaleDateString("ru")})`).join("\n")}`,
-            {
-                attachments: [Keyboard.inlineKeyboard([[Keyboard.button.link("Каталог", env.CATALOG_URL)]])],
-            },
-        );
+        await ctx.reply("Со списком мероприятий можно ознакомиться в приложении", {
+            attachments: [
+                Keyboard.inlineKeyboard([
+                    [Keyboard.button.link("Открыть приложение", `${env.CATALOG_URL}?token=${token}`)],
+                ]),
+            ],
+        });
     } catch (error) {
         console.error(error);
         await ctx.reply("Произошла ошибка");
