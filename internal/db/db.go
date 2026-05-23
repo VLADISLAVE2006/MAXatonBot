@@ -78,6 +78,30 @@ func InitDB() error {
 	}
 	log.Println("Table 'events' is ready")
 
+
+	// Таблица регистраций
+	createRegistrationsTableSQL := `
+	CREATE TABLE IF NOT EXISTS registrations (
+		id            SERIAL PRIMARY KEY,
+		user_id       BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+		event_id      INT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+		registered_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+		code          TEXT NOT NULL UNIQUE
+	);
+	`
+	_, err = DB.Exec(createRegistrationsTableSQL)
+	if err != nil {
+		return fmt.Errorf("failed to create registrations table: %w", err)
+	}
+	log.Println("Table 'registrations' is ready")
+
+	// Индекс для быстрого поиска
+	_, err = DB.Exec("CREATE INDEX IF NOT EXISTS idx_registrations_user_id ON registrations(user_id)")
+	if err != nil {
+		log.Printf("Warning: could not create index: %v", err)
+	}
+
+
 	if err := ensureAdmin(); err != nil {
 		log.Printf("Warning: could not ensure admin: %v", err)
 	}
