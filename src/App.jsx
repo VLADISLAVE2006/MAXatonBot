@@ -3,46 +3,42 @@ import styles from './App.module.scss';
 import EventCard from './components/EventCard';
 import FilterPanel from './components/FilterPanel';
 import EventModal from './components/EventModal';
-import { loadAllEvents } from './data/eventsData';
+import { api } from './api';
 
 function App() {
   const [events, setEvents] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState({
-    format: [],
-    type: [],
-  });
+  const [filters, setFilters] = useState({ format: [], type: [] });
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    loadEvents();
-    
-    const handleStorageChange = (e) => {
-      if (e.key === 'all_events') {
-        loadEvents();
-      }
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    api.events.getAll()
+      .then(setEvents)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
   }, []);
 
-  const loadEvents = () => {
-    const allEvents = loadAllEvents();
-    setEvents(allEvents);
+  const handleCardClick = async (event) => {
+    try {
+      const full = await api.events.getById(event.id);
+      setSelectedEvent({
+        ...full,
+        location: full.content,
+        totalSeats: full.max_slots,
+        remainingSeats: full.max_slots,
+        dateTime: full.date * 1000,
+      });
+    } catch (err) {
+      console.error('Failed to load event:', err);
+    }
   };
 
   const filteredEvents = events.filter((event) => {
-    const matchesSearch = event.title
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-
-    const matchesFormat =
-      filters.format.length === 0 || filters.format.includes(event.format);
-
-    const matchesType =
-      filters.type.length === 0 || filters.type.includes(event.type);
-
+    const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesFormat = filters.format.length === 0 || filters.format.includes(event.format);
+    const matchesType = filters.type.length === 0 || filters.type.includes(event.type);
     return matchesSearch && matchesFormat && matchesType;
   });
 
@@ -64,16 +60,18 @@ function App() {
       </div>
 
       <div className={styles.container}>
-        <div className={styles.counter}>
-          Найдено мероприятий: {filteredEvents.length}
-        </div>
+        {loading && <div className={styles.counter}>Загрузка...</div>}
+        {error && <div className={styles.counter}>Ошибка: {error}</div>}
+        {!loading && !error && (
+          <div className={styles.counter}>Найдено мероприятий: {filteredEvents.length}</div>
+        )}
 
         <div className={styles.eventsGrid}>
           {filteredEvents.map((event) => (
             <EventCard
               key={event.id}
               event={event}
-              onClick={() => setSelectedEvent(event)}
+              onClick={() => handleCardClick(event)}
             />
           ))}
         </div>

@@ -4,105 +4,128 @@ import EventCard from "./components/EventCard";
 import FilterPanel from "./components/FilterPanel";
 import EventModalOrganizer from "./components/EventModalOrganizer";
 import CreateEventModal from "./components/CreateEventModal";
-import {
-  loadAllEvents,
-  saveAllEvents,
-  addEvent,
-  updateEvent,
-  deleteEvent,
-} from "./data/eventsData";
-
-const ORGANIZER_ID = 1;
+import { api } from "./api";
 
 function OrganizerApp() {
-  const [allEvents, setAllEvents] = useState([]);
+  const [events, setEvents] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filters, setFilters] = useState({
-    format: [],
-    type: [],
-  });
+  const [filters, setFilters] = useState({ format: [], type: [] });
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const loadEvents = () => {
+    setLoading(true);
+    api.events
+      .getMyEvents()
+      .then(setEvents)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
     loadEvents();
-
-    const handleStorageChange = (e) => {
-      if (e.key === "all_events") {
-        loadEvents();
-      }
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
-  const loadEvents = () => {
-    const events = loadAllEvents();
-    setAllEvents(events);
-  };
-
-  const myEvents = allEvents.filter(
-    (event) => event.organizerId === ORGANIZER_ID,
-  );
-
-  const filteredEvents = myEvents.filter((event) => {
-    const matchesSearch = event.title
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-
-    const matchesFormat =
-      filters.format.length === 0 || filters.format.includes(event.format);
-
-    const matchesType =
-      filters.type.length === 0 || filters.type.includes(event.type);
-
-    return matchesSearch && matchesFormat && matchesType;
-  });
-
-  const handleCreateEvent = (newEventData, imageBase64) => {
-    const newEvent = {
-      ...newEventData,
-      id: Date.now(),
-      organizerId: ORGANIZER_ID,
-      remainingSeats: newEventData.totalSeats,
-      imageUrl:
-        imageBase64 ||
-        newEventData.imageUrl ||
-        "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&h=500&fit=crop",
-    };
-
-    const updatedEvents = addEvent(newEvent);
-    setAllEvents(updatedEvents);
-    setIsCreateModalOpen(false);
-  };
-
-  const handleEditEvent = (updatedEventData, imageBase64) => {
-    const updatedEvent = {
-      ...updatedEventData,
-      imageUrl: imageBase64 || updatedEventData.imageUrl,
-      remainingSeats: updatedEventData.totalSeats,
-    };
-
-    const updatedEvents = updateEvent(updatedEvent);
-    setAllEvents(updatedEvents);
-    setEditingEvent(null);
-    setSelectedEvent(null);
-  };
-
-  const handleDeleteEvent = (eventId) => {
-    if (window.confirm("Вы уверены, что хотите удалить это мероприятие?")) {
-      const updatedEvents = deleteEvent(eventId);
-      setAllEvents(updatedEvents);
-      setSelectedEvent(null);
+  const handleCardClick = async (event) => {
+    try {
+      const full = await api.events.getById(event.id);
+      setSelectedEvent({
+        ...full,
+        location: full.content,
+        totalSeats: full.max_slots,
+        remainingSeats: full.max_slots,
+        dateTime: full.date * 1000,
+      });
+    } catch (err) {
+      console.error("Failed to load event:", err);
     }
   };
 
-  const openEditModal = (event) => {
-    setEditingEvent(event);
-    setSelectedEvent(null);
+  const handleCreateEvent = async (formData) => {
+    try {
+      await api.events.create({
+        title: formData.title,
+        description: formData.description,
+        content: formData.location,
+        max_slots: formData.totalSeats
+          ? parseInt(formData.totalSeats, 10)
+          : null,
+        date: Math.floor(new Date(formData.dateTime).getTime() / 1000),
+        format: formData.format,
+        type: formData.type,
+      });
+      setIsCreateModalOpen(false);
+      loadEvents();
+    } catch (err) {
+      console.error("Failed to create event:", err);
+      alert("Ошибка при создании мероприятия");
+    }
   };
+
+  const handleEditEvent = async (formData) => {
+    try {
+      await api.events.update(formData.id, {
+        title: formData.title,
+        description: formData.description,
+        content: formData.location,
+        max_slots: formData.totalSeats
+          ? parseInt(formData.totalSeats, 10)
+          : null,
+        date: Math.floor(new Date(formData.dateTime).getTime() / 1000),
+        format: formData.format,
+        type: formData.type,
+      });
+      setEditingEvent(null);
+      setSelectedEvent(null);
+      loadEvents();
+    } catch (err) {
+      console.error("Failed to update event:", err);
+      alert("Ошибка при обновлении мероприятия");
+    }
+  };
+
+  const handleDeleteEvent = async (eventId) => {
+    if (!window.confirm("Вы уверены, что хотите удалить это мероприятие?"))
+      return;
+    try {
+      await api.events.delete(eventId);
+      setSelectedEvent(null);
+      loadEvents();
+    } catch (err) {
+      console.error("Failed to delete event:", err);
+      alert("Ошибка при удалении мероприятия");
+    }
+  };
+
+  const openEditModal = async (event) => {
+    try {
+      // Fetch full event to populate all form fields
+      const full = await api.events.getById(event.id);
+      setEditingEvent({
+        ...full,
+        location: full.content,
+        totalSeats: full.max_slots,
+        dateTime: new Date(full.date * 1000).toISOString().slice(0, 16),
+      });
+      setSelectedEvent(null);
+    } catch (err) {
+      console.error("Failed to load event for editing:", err);
+    }
+  };
+
+  const filteredEvents = events.filter((event) => {
+    const matchesSearch = event.title
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+    const matchesFormat =
+      filters.format.length === 0 || filters.format.includes(event.format);
+    const matchesType =
+      filters.type.length === 0 || filters.type.includes(event.type);
+    return matchesSearch && matchesFormat && matchesType;
+  });
 
   return (
     <div className={styles.app}>
@@ -131,16 +154,20 @@ function OrganizerApp() {
       </div>
 
       <div className={styles.container}>
-        <div className={styles.counter}>
-          Найдено моих мероприятий: {filteredEvents.length}
-        </div>
+        {loading && <div className={styles.counter}>Загрузка...</div>}
+        {error && <div className={styles.counter}>Ошибка: {error}</div>}
+        {!loading && !error && (
+          <div className={styles.counter}>
+            Найдено моих мероприятий: {filteredEvents.length}
+          </div>
+        )}
 
         <div className={styles.eventsGrid}>
           {filteredEvents.map((event) => (
             <EventCard
               key={event.id}
               event={event}
-              onClick={() => setSelectedEvent(event)}
+              onClick={() => handleCardClick(event)}
             />
           ))}
         </div>
