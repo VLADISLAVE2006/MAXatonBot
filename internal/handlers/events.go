@@ -6,23 +6,22 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log"
+	"math/rand"
 	"net/http"
 	"strconv"
-	"math/rand"
-    "time"
+	"time"
+
 	"github.com/gorilla/mux"
 )
 
-
 type Registration struct {
-    ID           int    `json:"id"`
-    EventID      int    `json:"event_id"`
-    EventTitle   string `json:"event_title"`
-    EventDate    int64  `json:"event_date"`
-    Code         string `json:"code"`
-    RegisteredAt int64  `json:"registered_at"`
+	ID           int    `json:"id"`
+	EventID      int    `json:"event_id"`
+	EventTitle   string `json:"event_title"`
+	EventDate    int64  `json:"event_date"`
+	Code         string `json:"code"`
+	RegisteredAt int64  `json:"registered_at"`
 }
-
 
 type Event struct {
 	ID                int     `json:"id"`
@@ -31,21 +30,22 @@ type Event struct {
 	Content           string  `json:"content"`
 	MaxSlots          *int    `json:"max_slots"`
 	CancellationRules *string `json:"cancellation_rules"`
-	Date              int64   `json:"date"`        // unix timestamp
+	Date              int64   `json:"date"` // unix timestamp
 	Format            string  `json:"format"`
 	Type              string  `json:"type"`
 	CreatedBy         int64   `json:"created_by"`
-	CreatedAt         int64   `json:"created_at"`  // unix timestamp
-	UpdatedAt         int64   `json:"updated_at"`  // unix timestamp
-	RegisteredCount int `json:"registered_count"`
+	CreatedAt         int64   `json:"created_at"` // unix timestamp
+	UpdatedAt         int64   `json:"updated_at"` // unix timestamp
+	RegisteredCount   int     `json:"registered_count"`
 }
 
 type ShortEvent struct {
-	ID          int    `json:"id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Date        int64  `json:"date"` // unix timestamp
-	RegisteredCount int   `json:"registered_count"`
+	ID              int    `json:"id"`
+	Title           string `json:"title"`
+	Description     string `json:"description"`
+	Date            int64  `json:"date"`
+	MaxSlots        *int   `json:"max_slots"`
+	RegisteredCount int    `json:"registered_count"`
 }
 
 type CreateEventRequest struct {
@@ -59,56 +59,53 @@ type CreateEventRequest struct {
 	Type              string  `json:"type"`
 }
 
-
-
-
-//Для абитуриента
-//HandleGetEvents возвращает список мероприятий в кратком виде
+// Для абитуриента
+// HandleGetEvents возвращает список мероприятий в кратком виде
 func HandleGetEvents(w http.ResponseWriter, r *http.Request) {
-    rows, err := db.DB.Query(`
-        SELECT 
-            e.id, 
-            e.title, 
-            e.description, 
+	rows, err := db.DB.Query(`
+        SELECT
+            e.id,
+            e.title,
+            e.description,
             EXTRACT(epoch FROM e.date)::bigint AS date,
+            e.max_slots,
             COUNT(r.id) AS registered_count
         FROM events e
         LEFT JOIN registrations r ON e.id = r.event_id
-        GROUP BY e.id, e.title, e.description, e.date
+        GROUP BY e.id, e.title, e.description, e.date, e.max_slots
         ORDER BY e.created_at DESC
     `)
-    if err != nil {
-        log.Printf("HandleGetEvents DB error: %v", err)
-        writeError(w, http.StatusInternalServerError, "database error")
-        return
-    }
-    defer rows.Close()
+	if err != nil {
+		log.Printf("HandleGetEvents DB error: %v", err)
+		writeError(w, http.StatusInternalServerError, "database error")
+		return
+	}
+	defer rows.Close()
 
-    events := []ShortEvent{}
-    for rows.Next() {
-        var e ShortEvent
-        if err := rows.Scan(&e.ID, &e.Title, &e.Description, &e.Date, &e.RegisteredCount); err != nil {
-            log.Printf("HandleGetEvents scan error: %v", err)
-            continue
-        }
-        events = append(events, e)
-    }
+	events := []ShortEvent{}
+	for rows.Next() {
+		var e ShortEvent
+		if err := rows.Scan(&e.ID, &e.Title, &e.Description, &e.Date, &e.MaxSlots, &e.RegisteredCount); err != nil {
+			log.Printf("HandleGetEvents scan error: %v", err)
+			continue
+		}
+		events = append(events, e)
+	}
 
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(events)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(events)
 }
-
 
 // HandleGetEventByID возвращает полную информацию о мероприятии
 func HandleGetEventByID(w http.ResponseWriter, r *http.Request) {
-    id, err := strconv.Atoi(mux.Vars(r)["id"])
-    if err != nil {
-        writeError(w, http.StatusBadRequest, "invalid event id")
-        return
-    }
+	id, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid event id")
+		return
+	}
 
-    var e Event
-    err = db.DB.QueryRow(`
+	var e Event
+	err = db.DB.QueryRow(`
         SELECT 
             e.id, e.title, e.description, e.content, 
             e.max_slots, e.cancellation_rules,
@@ -123,183 +120,180 @@ func HandleGetEventByID(w http.ResponseWriter, r *http.Request) {
         GROUP BY e.id, e.title, e.description, e.content, e.max_slots, e.cancellation_rules,
                  e.date, e.format, e.type, e.created_by, e.created_at, e.updated_at
     `, id).Scan(
-        &e.ID, &e.Title, &e.Description, &e.Content,
-        &e.MaxSlots, &e.CancellationRules,
-        &e.Date, &e.Format, &e.Type,
-        &e.CreatedBy,
-        &e.CreatedAt, &e.UpdatedAt,
-        &e.RegisteredCount,
-    )
-    if err == sql.ErrNoRows {
-        writeError(w, http.StatusNotFound, "event not found")
-        return
-    }
-    if err != nil {
-        log.Printf("HandleGetEventByID DB error: %v", err)
-        writeError(w, http.StatusInternalServerError, "database error")
-        return
-    }
+		&e.ID, &e.Title, &e.Description, &e.Content,
+		&e.MaxSlots, &e.CancellationRules,
+		&e.Date, &e.Format, &e.Type,
+		&e.CreatedBy,
+		&e.CreatedAt, &e.UpdatedAt,
+		&e.RegisteredCount,
+	)
+	if err == sql.ErrNoRows {
+		writeError(w, http.StatusNotFound, "event not found")
+		return
+	}
+	if err != nil {
+		log.Printf("HandleGetEventByID DB error: %v", err)
+		writeError(w, http.StatusInternalServerError, "database error")
+		return
+	}
 
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(e)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(e)
 }
 
 // HandleRegisterEvent записывает текущего пользователя на мероприятие
 func HandleRegisterEvent(w http.ResponseWriter, r *http.Request) {
-    claims := middleware.GetClaims(r)
-    userID := claims.UserID
+	claims := middleware.GetClaims(r)
+	userID := claims.UserID
 
-    vars := mux.Vars(r)
-    eventID, err := strconv.Atoi(vars["id"])
-    if err != nil {
-        writeError(w, http.StatusBadRequest, "invalid event id")
-        return
-    }
+	vars := mux.Vars(r)
+	eventID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid event id")
+		return
+	}
 
-    // Проверяем, существует ли мероприятие
-    var maxSlots *int
-    var currentCount int
-    err = db.DB.QueryRow(`
+	// Проверяем, существует ли мероприятие
+	var maxSlots *int
+	var currentCount int
+	err = db.DB.QueryRow(`
         SELECT max_slots, (SELECT COUNT(*) FROM registrations WHERE event_id = $1)
         FROM events WHERE id = $1
     `, eventID).Scan(&maxSlots, &currentCount)
-    if err == sql.ErrNoRows {
-        writeError(w, http.StatusNotFound, "event not found")
-        return
-    }
-    if err != nil {
-        log.Printf("RegisterEvent DB error: %v", err)
-        writeError(w, http.StatusInternalServerError, "database error")
-        return
-    }
+	if err == sql.ErrNoRows {
+		writeError(w, http.StatusNotFound, "event not found")
+		return
+	}
+	if err != nil {
+		log.Printf("RegisterEvent DB error: %v", err)
+		writeError(w, http.StatusInternalServerError, "database error")
+		return
+	}
 
-    // Проверяем, есть ли свободные места (если max_slots не NULL и не 0)
-    if maxSlots != nil && *maxSlots > 0 && currentCount >= *maxSlots {
-        writeError(w, http.StatusConflict, "no free slots available")
-        return
-    }
+	// Проверяем, есть ли свободные места (если max_slots не NULL и не 0)
+	if maxSlots != nil && *maxSlots > 0 && currentCount >= *maxSlots {
+		writeError(w, http.StatusConflict, "no free slots available")
+		return
+	}
 
-    // Проверяем, не записан ли пользователь уже
-    var alreadyRegistered bool
-    err = db.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM registrations WHERE user_id = $1 AND event_id = $2)", userID, eventID).Scan(&alreadyRegistered)
-    if err != nil {
-        writeError(w, http.StatusInternalServerError, "database error")
-        return
-    }
-    if alreadyRegistered {
-        writeError(w, http.StatusConflict, "already registered for this event")
-        return
-    }
+	// Проверяем, не записан ли пользователь уже
+	var alreadyRegistered bool
+	err = db.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM registrations WHERE user_id = $1 AND event_id = $2)", userID, eventID).Scan(&alreadyRegistered)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "database error")
+		return
+	}
+	if alreadyRegistered {
+		writeError(w, http.StatusConflict, "already registered for this event")
+		return
+	}
 
-    // Генерируем уникальный код записи
-    code := generateRegistrationCode()
+	// Генерируем уникальный код записи
+	code := generateRegistrationCode()
 
-    // Вставляем запись
-    var regID int
-    var registeredAt time.Time
-    err = db.DB.QueryRow(`
+	// Вставляем запись
+	var regID int
+	var registeredAt time.Time
+	err = db.DB.QueryRow(`
         INSERT INTO registrations (user_id, event_id, code)
         VALUES ($1, $2, $3)
         RETURNING id, registered_at
     `, userID, eventID, code).Scan(&regID, &registeredAt)
-    if err != nil {
-        log.Printf("RegisterEvent insert error: %v", err)
-        writeError(w, http.StatusInternalServerError, "failed to register")
-        return
-    }
+	if err != nil {
+		log.Printf("RegisterEvent insert error: %v", err)
+		writeError(w, http.StatusInternalServerError, "failed to register")
+		return
+	}
 
-    // Получаем название и дату мероприятия для ответа
-    var eventTitle string
-    var eventDate int64
-    db.DB.QueryRow("SELECT title, EXTRACT(epoch FROM date)::bigint FROM events WHERE id = $1", eventID).Scan(&eventTitle, &eventDate)
+	// Получаем название и дату мероприятия для ответа
+	var eventTitle string
+	var eventDate int64
+	db.DB.QueryRow("SELECT title, EXTRACT(epoch FROM date)::bigint FROM events WHERE id = $1", eventID).Scan(&eventTitle, &eventDate)
 
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(http.StatusCreated)
-    json.NewEncoder(w).Encode(map[string]interface{}{
-        "status":         "registered",
-        "code":           code,
-        "event_id":       eventID,
-        "event_title":    eventTitle,
-        "event_date":     eventDate,
-        "registered_at":  registeredAt.Unix(),
-    })
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":        "registered",
+		"code":          code,
+		"event_id":      eventID,
+		"event_title":   eventTitle,
+		"event_date":    eventDate,
+		"registered_at": registeredAt.Unix(),
+	})
 }
-
 
 // HandleCancelEvent отменяет запись пользователя на мероприятие
 func HandleCancelEvent(w http.ResponseWriter, r *http.Request) {
-    claims := middleware.GetClaims(r)
-    userID := claims.UserID
+	claims := middleware.GetClaims(r)
+	userID := claims.UserID
 
-    vars := mux.Vars(r)
-    eventID, err := strconv.Atoi(vars["id"])
-    if err != nil {
-        writeError(w, http.StatusBadRequest, "invalid event id")
-        return
-    }
+	vars := mux.Vars(r)
+	eventID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid event id")
+		return
+	}
 
-    result, err := db.DB.Exec("DELETE FROM registrations WHERE user_id = $1 AND event_id = $2", userID, eventID)
-    if err != nil {
-        log.Printf("CancelEvent DB error: %v", err)
-        writeError(w, http.StatusInternalServerError, "failed to cancel registration")
-        return
-    }
-    rowsAffected, _ := result.RowsAffected()
-    if rowsAffected == 0 {
-        writeError(w, http.StatusNotFound, "registration not found")
-        return
-    }
+	result, err := db.DB.Exec("DELETE FROM registrations WHERE user_id = $1 AND event_id = $2", userID, eventID)
+	if err != nil {
+		log.Printf("CancelEvent DB error: %v", err)
+		writeError(w, http.StatusInternalServerError, "failed to cancel registration")
+		return
+	}
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		writeError(w, http.StatusNotFound, "registration not found")
+		return
+	}
 
-    w.WriteHeader(http.StatusOK)
-    json.NewEncoder(w).Encode(map[string]string{"status": "registration cancelled"})
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "registration cancelled"})
 }
 
 // HandleMyRegistrations возвращает список мероприятий, на которые записан пользователь
 func HandleMyRegistrations(w http.ResponseWriter, r *http.Request) {
-    claims := middleware.GetClaims(r)
-    userID := claims.UserID
+	claims := middleware.GetClaims(r)
+	userID := claims.UserID
 
-    rows, err := db.DB.Query(`
+	rows, err := db.DB.Query(`
         SELECT r.id, r.event_id, e.title, EXTRACT(epoch FROM e.date)::bigint, r.code, EXTRACT(epoch FROM r.registered_at)::bigint
         FROM registrations r
         JOIN events e ON r.event_id = e.id
         WHERE r.user_id = $1
         ORDER BY e.date ASC
     `, userID)
-    if err != nil {
-        log.Printf("MyRegistrations DB error: %v", err)
-        writeError(w, http.StatusInternalServerError, "database error")
-        return
-    }
-    defer rows.Close()
+	if err != nil {
+		log.Printf("MyRegistrations DB error: %v", err)
+		writeError(w, http.StatusInternalServerError, "database error")
+		return
+	}
+	defer rows.Close()
 
-    registrations := []Registration{}
-    for rows.Next() {
-        var reg Registration
-        if err := rows.Scan(&reg.ID, &reg.EventID, &reg.EventTitle, &reg.EventDate, &reg.Code, &reg.RegisteredAt); err != nil {
-            log.Printf("MyRegistrations scan error: %v", err)
-            continue
-        }
-        registrations = append(registrations, reg)
-    }
+	registrations := []Registration{}
+	for rows.Next() {
+		var reg Registration
+		if err := rows.Scan(&reg.ID, &reg.EventID, &reg.EventTitle, &reg.EventDate, &reg.Code, &reg.RegisteredAt); err != nil {
+			log.Printf("MyRegistrations scan error: %v", err)
+			continue
+		}
+		registrations = append(registrations, reg)
+	}
 
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(registrations)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(registrations)
 }
 
 // generateRegistrationCode создаёт случайный 8-значный код
 func generateRegistrationCode() string {
-    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    b := make([]byte, 8)
-    for i := range b {
-        b[i] = letters[rand.Intn(len(letters))]
-    }
-    return string(b)
+	const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, 8)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
 }
 
-
-
-//для организатора
+// для организатора
 // HandleCreateEvent создаёт новое мероприятие (только для организатора)
 func HandleCreateEvent(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r)
@@ -375,53 +369,39 @@ func HandleCreateEvent(w http.ResponseWriter, r *http.Request) {
 
 // HandleGetOrganizerEvents возвращает список мероприятий, созданных текущим организатором
 func HandleGetOrganizerEvents(w http.ResponseWriter, r *http.Request) {
-    claims := middleware.GetClaims(r)
-    userID := claims.UserID
+	claims := middleware.GetClaims(r)
+	userID := claims.UserID
 
-    rows, err := db.DB.Query(`
-        SELECT 
-       		e.id, e.title, e.description, EXTRACT(epoch FROM e.date)::bigint AS date,
-        	COUNT(r.id) AS registered_count
+	rows, err := db.DB.Query(`
+        SELECT
+            e.id, e.title, e.description, EXTRACT(epoch FROM e.date)::bigint AS date,
+            e.max_slots, COUNT(r.id) AS registered_count
         FROM events e
         LEFT JOIN registrations r ON e.id = r.event_id
         WHERE e.created_by = $1
-        GROUP BY e.id, e.title, e.description, e.date
+        GROUP BY e.id, e.title, e.description, e.date, e.max_slots
         ORDER BY e.created_at DESC
     `, userID)
-    if err != nil {
-        log.Printf("HandleGetOrganizerEvents DB error: %v", err)
-        writeError(w, http.StatusInternalServerError, "database error")
-        return
-    }
-    defer rows.Close()
+	if err != nil {
+		log.Printf("HandleGetOrganizerEvents DB error: %v", err)
+		writeError(w, http.StatusInternalServerError, "database error")
+		return
+	}
+	defer rows.Close()
 
-    events := []struct {
-        ID             int    `json:"id"`
-        Title          string `json:"title"`
-        Description    string `json:"description"`
-        Date           int64  `json:"date"`
-        RegisteredCount int   `json:"registered_count"`
-    }{}
-    for rows.Next() {
-        var e struct {
-            ID             int    `json:"id"`
-            Title          string `json:"title"`
-            Description    string `json:"description"`
-            Date           int64  `json:"date"`
-            RegisteredCount int   `json:"registered_count"`
-        }
-        if err := rows.Scan(&e.ID, &e.Title, &e.Description, &e.Date, &e.RegisteredCount); err != nil {
-            log.Printf("HandleGetOrganizerEvents scan error: %v", err)
-            continue
-        }
-        events = append(events, e)
-    }
+	events := []ShortEvent{}
+	for rows.Next() {
+		var e ShortEvent
+		if err := rows.Scan(&e.ID, &e.Title, &e.Description, &e.Date, &e.MaxSlots, &e.RegisteredCount); err != nil {
+			log.Printf("HandleGetOrganizerEvents scan error: %v", err)
+			continue
+		}
+		events = append(events, e)
+	}
 
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(events)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(events)
 }
-
-
 
 // HandleUpdateEvent обновляет существующее мероприятие (только для создателя)
 func HandleUpdateEvent(w http.ResponseWriter, r *http.Request) {
