@@ -37,6 +37,7 @@ type Event struct {
 	CreatedBy         int64   `json:"created_by"`
 	CreatedAt         int64   `json:"created_at"`  // unix timestamp
 	UpdatedAt         int64   `json:"updated_at"`  // unix timestamp
+	RegisteredCount int `json:"registered_count"`
 }
 
 type ShortEvent struct {
@@ -44,6 +45,7 @@ type ShortEvent struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Date        int64  `json:"date"` // unix timestamp
+	RegisteredCount int   `json:"registered_count"`
 }
 
 type CreateEventRequest struct {
@@ -61,72 +63,85 @@ type CreateEventRequest struct {
 
 
 //Для абитуриента
-// HandleGetEvents возвращает список мероприятий в кратком виде
+//HandleGetEvents возвращает список мероприятий в кратком виде
 func HandleGetEvents(w http.ResponseWriter, r *http.Request) {
-	// Исправленный запрос: выбираем только нужные поля и преобразуем date в int64
-	rows, err := db.DB.Query(`
-		SELECT id, title, description, EXTRACT(epoch FROM date)::bigint AS date
-		FROM events
-		ORDER BY created_at DESC
-	`)
-	if err != nil {
-		log.Printf("HandleGetEvents DB error: %v", err)
-		writeError(w, http.StatusInternalServerError, "database error")
-		return
-	}
-	defer rows.Close()
+    rows, err := db.DB.Query(`
+        SELECT 
+            e.id, 
+            e.title, 
+            e.description, 
+            EXTRACT(epoch FROM e.date)::bigint AS date,
+            COUNT(r.id) AS registered_count
+        FROM events e
+        LEFT JOIN registrations r ON e.id = r.event_id
+        GROUP BY e.id, e.title, e.description, e.date
+        ORDER BY e.created_at DESC
+    `)
+    if err != nil {
+        log.Printf("HandleGetEvents DB error: %v", err)
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
+    defer rows.Close()
 
-	events := []ShortEvent{}
-	for rows.Next() {
-		var e ShortEvent
-		if err := rows.Scan(&e.ID, &e.Title, &e.Description, &e.Date); err != nil {
-			log.Printf("HandleGetEvents scan error: %v", err)
-			continue
-		}
-		events = append(events, e)
-	}
+    events := []ShortEvent{}
+    for rows.Next() {
+        var e ShortEvent
+        if err := rows.Scan(&e.ID, &e.Title, &e.Description, &e.Date, &e.RegisteredCount); err != nil {
+            log.Printf("HandleGetEvents scan error: %v", err)
+            continue
+        }
+        events = append(events, e)
+    }
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(events)
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(events)
 }
+
 
 // HandleGetEventByID возвращает полную информацию о мероприятии
 func HandleGetEventByID(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(mux.Vars(r)["id"])
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid event id")
-		return
-	}
+    id, err := strconv.Atoi(mux.Vars(r)["id"])
+    if err != nil {
+        writeError(w, http.StatusBadRequest, "invalid event id")
+        return
+    }
 
-	var e Event
-	err = db.DB.QueryRow(`
-		SELECT 
-			id, title, description, content, 
-			max_slots, cancellation_rules,
-			EXTRACT(epoch FROM date)::bigint AS date,
-			format, type, created_by,
-			EXTRACT(epoch FROM created_at)::bigint AS created_at,
-			EXTRACT(epoch FROM updated_at)::bigint AS updated_at
-		FROM events WHERE id = $1
-	`, id).Scan(
-		&e.ID, &e.Title, &e.Description, &e.Content,
-		&e.MaxSlots, &e.CancellationRules,
-		&e.Date, &e.Format, &e.Type,
-		&e.CreatedBy,
-		&e.CreatedAt, &e.UpdatedAt,
-	)
-	if err == sql.ErrNoRows {
-		writeError(w, http.StatusNotFound, "event not found")
-		return
-	}
-	if err != nil {
-		log.Printf("HandleGetEventByID DB error: %v", err)
-		writeError(w, http.StatusInternalServerError, "database error")
-		return
-	}
+    var e Event
+    err = db.DB.QueryRow(`
+        SELECT 
+            e.id, e.title, e.description, e.content, 
+            e.max_slots, e.cancellation_rules,
+            EXTRACT(epoch FROM e.date)::bigint AS date,
+            e.format, e.type, e.created_by,
+            EXTRACT(epoch FROM e.created_at)::bigint AS created_at,
+            EXTRACT(epoch FROM e.updated_at)::bigint AS updated_at,
+            COUNT(r.id) AS registered_count
+        FROM events e
+        LEFT JOIN registrations r ON e.id = r.event_id
+        WHERE e.id = $1
+        GROUP BY e.id, e.title, e.description, e.content, e.max_slots, e.cancellation_rules,
+                 e.date, e.format, e.type, e.created_by, e.created_at, e.updated_at
+    `, id).Scan(
+        &e.ID, &e.Title, &e.Description, &e.Content,
+        &e.MaxSlots, &e.CancellationRules,
+        &e.Date, &e.Format, &e.Type,
+        &e.CreatedBy,
+        &e.CreatedAt, &e.UpdatedAt,
+        &e.RegisteredCount,
+    )
+    if err == sql.ErrNoRows {
+        writeError(w, http.StatusNotFound, "event not found")
+        return
+    }
+    if err != nil {
+        log.Printf("HandleGetEventByID DB error: %v", err)
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(e)
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(e)
 }
 
 // HandleRegisterEvent записывает текущего пользователя на мероприятие
@@ -364,10 +379,14 @@ func HandleGetOrganizerEvents(w http.ResponseWriter, r *http.Request) {
     userID := claims.UserID
 
     rows, err := db.DB.Query(`
-        SELECT id, title, description, EXTRACT(epoch FROM date)::bigint AS date
-        FROM events
-        WHERE created_by = $1
-        ORDER BY created_at DESC
+        SELECT 
+       		e.id, e.title, e.description, EXTRACT(epoch FROM e.date)::bigint AS date,
+        	COUNT(r.id) AS registered_count
+        FROM events e
+        LEFT JOIN registrations r ON e.id = r.event_id
+        WHERE e.created_by = $1
+        GROUP BY e.id, e.title, e.description, e.date
+        ORDER BY e.created_at DESC
     `, userID)
     if err != nil {
         log.Printf("HandleGetOrganizerEvents DB error: %v", err)
@@ -376,10 +395,22 @@ func HandleGetOrganizerEvents(w http.ResponseWriter, r *http.Request) {
     }
     defer rows.Close()
 
-    events := []ShortEvent{}
+    events := []struct {
+        ID             int    `json:"id"`
+        Title          string `json:"title"`
+        Description    string `json:"description"`
+        Date           int64  `json:"date"`
+        RegisteredCount int   `json:"registered_count"`
+    }{}
     for rows.Next() {
-        var e ShortEvent
-        if err := rows.Scan(&e.ID, &e.Title, &e.Description, &e.Date); err != nil {
+        var e struct {
+            ID             int    `json:"id"`
+            Title          string `json:"title"`
+            Description    string `json:"description"`
+            Date           int64  `json:"date"`
+            RegisteredCount int   `json:"registered_count"`
+        }
+        if err := rows.Scan(&e.ID, &e.Title, &e.Description, &e.Date, &e.RegisteredCount); err != nil {
             log.Printf("HandleGetOrganizerEvents scan error: %v", err)
             continue
         }
