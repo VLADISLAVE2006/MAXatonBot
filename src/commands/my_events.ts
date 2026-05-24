@@ -118,13 +118,17 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
         const buttons =
             role === "applicant"
                 ? [
-                      ...(isPast && event.closed ? [[Keyboard.button.callback("✍️ Оставить отзыв", `review:${event.id}`)]] : []),
+                      ...(isPast && event.closed
+                          ? [[Keyboard.button.callback("✍️ Оставить отзыв", `review:${event.id}`)]]
+                          : []),
                       ...(!isPast ? [[Keyboard.button.callback("❌ Отменить запись", `cancel:${event.id}`)]] : []),
                       [backToMyEvents],
                   ]
                 : [
                       ...(isPast ? [[Keyboard.button.callback("📊 Статистика", `event_stats:${event.id}`)]] : []),
-                      ...(isPast && !event.closed ? [[Keyboard.button.callback("🔒 Закрыть мероприятие", `close_event:${event.id}`)]] : []),
+                      ...(isPast && !event.closed
+                          ? [[Keyboard.button.callback("🔒 Закрыть мероприятие", `close_event:${event.id}`)]]
+                          : []),
                       [Keyboard.button.callback("📲 QR-код посещаемости", `event_qr:${event.id}`)],
                       [backToMyEvents],
                   ];
@@ -194,9 +198,10 @@ export async function handleEventStatsCallback(ctx: AppContext): Promise<boolean
     const token = getToken(ctx.user!.user_id) ?? "";
     try {
         const stats = await api.events.getEventStats(eventId, token);
-        const ratingLine = stats.reviews_count > 0
-            ? `⭐ Рейтинг: ${stats.average_rating.toFixed(1)} (${stats.reviews_count} отзывов)\n`
-            : "";
+        const ratingLine =
+            stats.reviews_count > 0
+                ? `⭐ Рейтинг: ${stats.average_rating.toFixed(1)} (${stats.reviews_count} отзывов)\n`
+                : "";
         await ctx.editMessage({
             text:
                 `📊 Статистика мероприятия\n\n` +
@@ -204,13 +209,65 @@ export async function handleEventStatsCallback(ctx: AppContext): Promise<boolean
                 `✅ Пришло: ${stats.total_attended}\n` +
                 `📈 Явка: ${stats.percentage.toFixed(1)}%\n` +
                 ratingLine,
-            attachments: [Keyboard.inlineKeyboard([[backToMyEvents]])],
+            attachments: [
+                Keyboard.inlineKeyboard([
+                    [Keyboard.button.callback("👥 Список участников", `event_attendees:${eventId}:0`)],
+                    [backToMyEvents],
+                ]),
+            ],
         });
     } catch (error) {
         console.error(error);
         await ctx.editMessage({
             text: "Не удалось загрузить статистику.",
             attachments: [Keyboard.inlineKeyboard([[backToMyEvents]])],
+        });
+    }
+    return true;
+}
+
+const PAGE_SIZE = 10;
+
+export async function handleAttendeesCallback(ctx: AppContext): Promise<boolean> {
+    const payload = ctx.callback?.payload;
+    if (!payload?.startsWith("event_attendees:")) return false;
+
+    const parts = payload.replace("event_attendees:", "").split(":");
+    const eventId = parseInt(parts[0] ?? "", 10);
+    const page = parseInt(parts[1] ?? "0", 10);
+    if (isNaN(eventId) || isNaN(page)) return false;
+
+    const token = getToken(ctx.user!.user_id) ?? "";
+    try {
+        const attendees = await api.events.getEventAttendees(eventId, token);
+        const total = attendees.length;
+        const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+        const slice = attendees.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+        const lines = slice
+            .map((a, i) => `${page * PAGE_SIZE + i + 1}. ${a.full_name} ${a.attended ? "✅" : "❌"}`)
+            .join("\n");
+
+        const navRow: ReturnType<typeof Keyboard.button.callback>[] = [];
+        if (page > 0) navRow.push(Keyboard.button.callback("🔙 Назад", `event_attendees:${eventId}:${page - 1}`));
+        if (page < totalPages - 1)
+            navRow.push(Keyboard.button.callback("Вперёд ⏩", `event_attendees:${eventId}:${page + 1}`));
+
+        const rows = [
+            ...(navRow.length ? [navRow] : []),
+            [Keyboard.button.callback("📊 К статистике", `event_stats:${eventId}`)],
+        ];
+
+        await ctx.editMessage({
+            text: `👥 Участники (${total}):\n\n${lines}`,
+            attachments: [Keyboard.inlineKeyboard(rows)],
+        });
+    } catch {
+        await ctx.editMessage({
+            text: "Не удалось загрузить список участников.",
+            attachments: [
+                Keyboard.inlineKeyboard([[Keyboard.button.callback("📊 К статистике", `event_stats:${eventId}`)]]),
+            ],
         });
     }
     return true;
