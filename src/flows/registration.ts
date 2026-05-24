@@ -12,6 +12,7 @@ import {
     setFlow,
 } from "@/context";
 import { api } from "@/api";
+import { sendHub } from "@/commands/menu";
 
 const ConsentKeyboard = Keyboard.inlineKeyboard([
     [
@@ -20,9 +21,14 @@ const ConsentKeyboard = Keyboard.inlineKeyboard([
     ],
 ]);
 
-export function startRegistration(ctx: AppContext) {
+export async function startRegistration(ctx: AppContext) {
     const userId = ctx.user?.user_id;
     if (!userId) return;
+
+    if (getToken(userId)) {
+        await sendHub(ctx);
+        return;
+    }
 
     resetSession(userId);
     setSession(userId, {

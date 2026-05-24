@@ -1,18 +1,17 @@
-import { helpCommand } from "@/commands/help";
+import { sendHub } from "@/commands/menu";
 import { setRole, setToken, type AppContext } from "@/context";
 import type { Bot } from "@maxhub/max-bot-api";
 import { startRegistration } from "@/flows/registration";
 import { api } from "@/api";
-import { eventsCommand, handleEventsCallback } from "./events";
-import { myEventsCommand, handleMyEventsCallback, handleCancelRegistrationCallback } from "./my_events";
+import { handleMenuCallback } from "./menu";
+import { handleHubEventsCallback, handleRegisterCallback } from "./events";
+import { handleHubMyEventsCallback, handleCancelRegistrationCallback } from "./my_events";
 
 export type CallbackHandler = (ctx: AppContext) => boolean | Promise<boolean>;
 
 export function initCommands(bot: Bot<AppContext>) {
-    bot.command("help", helpCommand);
+    bot.command("help", sendHub);
     bot.command("start", startRegistration); // TODO удалить после тестов
-    bot.command("events", eventsCommand);
-    bot.command("my_events", myEventsCommand);
     // TODO удалить после тестов
     bot.command("refresh", async (ctx) => {
         try {
@@ -28,5 +27,5 @@ export function initCommands(bot: Bot<AppContext>) {
 }
 
 export function collectCommandCallbackHandlers(): CallbackHandler[] {
-    return [handleEventsCallback, handleMyEventsCallback, handleCancelRegistrationCallback];
+    return [handleMenuCallback, handleHubEventsCallback, handleRegisterCallback, handleHubMyEventsCallback, handleCancelRegistrationCallback];
 }

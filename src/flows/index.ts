@@ -1,5 +1,5 @@
 import type { Bot } from "@maxhub/max-bot-api";
-import { helpCommand } from "@/commands/help";
+import { sendHub } from "@/commands/menu";
 import { collectCommandCallbackHandlers } from "@/commands";
 import { getSession, type AppContext } from "@/context";
 import { handleRegistrationCallback, handleRegistrationMessage, startRegistration } from "./registration";
@@ -40,7 +40,7 @@ export function initFlows(bot: Bot<AppContext>) {
         }
 
         if (text && !session?.flow) {
-            await helpCommand(ctx);
+            await sendHub(ctx);
             return;
         }
 
