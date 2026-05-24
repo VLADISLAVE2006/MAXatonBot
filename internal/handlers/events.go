@@ -37,6 +37,7 @@ type Event struct {
 	CreatedAt         int64   `json:"created_at"` // unix timestamp
 	UpdatedAt         int64   `json:"updated_at"` // unix timestamp
 	RegisteredCount   int     `json:"registered_count"`
+    IsRegistered bool `json:"is_registered"`
 }
 
 type ShortEvent struct {
@@ -98,14 +99,17 @@ func HandleGetEvents(w http.ResponseWriter, r *http.Request) {
 
 // HandleGetEventByID возвращает полную информацию о мероприятии
 func HandleGetEventByID(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(mux.Vars(r)["id"])
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid event id")
-		return
-	}
+    claims := middleware.GetClaims(r)
+    userID := claims.UserID
 
-	var e Event
-	err = db.DB.QueryRow(`
+    id, err := strconv.Atoi(mux.Vars(r)["id"])
+    if err != nil {
+        writeError(w, http.StatusBadRequest, "invalid event id")
+        return
+    }
+
+    var e Event
+    err = db.DB.QueryRow(`
         SELECT 
             e.id, e.title, e.description, e.content, 
             e.max_slots, e.cancellation_rules,
@@ -113,32 +117,34 @@ func HandleGetEventByID(w http.ResponseWriter, r *http.Request) {
             e.format, e.type, e.created_by,
             EXTRACT(epoch FROM e.created_at)::bigint AS created_at,
             EXTRACT(epoch FROM e.updated_at)::bigint AS updated_at,
-            COUNT(r.id) AS registered_count
+            COUNT(r.id) AS registered_count,
+            EXISTS(SELECT 1 FROM registrations WHERE user_id = $1 AND event_id = e.id) AS is_registered
         FROM events e
         LEFT JOIN registrations r ON e.id = r.event_id
-        WHERE e.id = $1
+        WHERE e.id = $2
         GROUP BY e.id, e.title, e.description, e.content, e.max_slots, e.cancellation_rules,
                  e.date, e.format, e.type, e.created_by, e.created_at, e.updated_at
-    `, id).Scan(
-		&e.ID, &e.Title, &e.Description, &e.Content,
-		&e.MaxSlots, &e.CancellationRules,
-		&e.Date, &e.Format, &e.Type,
-		&e.CreatedBy,
-		&e.CreatedAt, &e.UpdatedAt,
-		&e.RegisteredCount,
-	)
-	if err == sql.ErrNoRows {
-		writeError(w, http.StatusNotFound, "event not found")
-		return
-	}
-	if err != nil {
-		log.Printf("HandleGetEventByID DB error: %v", err)
-		writeError(w, http.StatusInternalServerError, "database error")
-		return
-	}
+    `, userID, id).Scan(
+        &e.ID, &e.Title, &e.Description, &e.Content,
+        &e.MaxSlots, &e.CancellationRules,
+        &e.Date, &e.Format, &e.Type,
+        &e.CreatedBy,
+        &e.CreatedAt, &e.UpdatedAt,
+        &e.RegisteredCount,
+        &e.IsRegistered,
+    )
+    if err == sql.ErrNoRows {
+        writeError(w, http.StatusNotFound, "event not found")
+        return
+    }
+    if err != nil {
+        log.Printf("HandleGetEventByID DB error: %v", err)
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(e)
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(e)
 }
 
 // HandleRegisterEvent записывает текущего пользователя на мероприятие
