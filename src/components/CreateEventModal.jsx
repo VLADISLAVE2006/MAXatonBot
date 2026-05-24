@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 const CreateEventModal = ({ event, onClose, onSave }) => {
   const isEditing = !!event;
@@ -9,9 +9,9 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
     dateTime: event?.dateTime || '',
     location: event?.location || '',
     totalSeats: event?.totalSeats || '',
+    cancellationRules: event?.cancellationRules || '',
     format: event?.format || 'offline',
     type: event?.type || 'hackathon',
-    typeLabel: event?.typeLabel || 'Хакатон',
   });
   
   const [imageFile, setImageFile] = useState(null);
@@ -86,11 +86,6 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    
-    if (name === 'type') {
-      const selectedType = typeOptions.find(opt => opt.value === value);
-      setFormData(prev => ({ ...prev, typeLabel: selectedType?.label || value }));
-    }
   };
 
   const handleImageChange = (e) => {
@@ -412,6 +407,17 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
               min="1"
               style={styles.input}
               required
+            />
+          </div>
+
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Правила отмены</label>
+            <textarea
+              name="cancellationRules"
+              value={formData.cancellationRules}
+              onChange={handleChange}
+              placeholder="Условия отмены записи"
+              style={styles.textarea}
             />
           </div>
 

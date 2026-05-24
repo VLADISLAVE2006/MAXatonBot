@@ -62,6 +62,7 @@ function OrganizerApp() {
         max_slots: formData.totalSeats
           ? parseInt(formData.totalSeats, 10)
           : null,
+        cancellation_rules: formData.cancellationRules?.trim() || null,
         date: Math.floor(new Date(formData.dateTime).getTime() / 1000),
         format: formData.format,
         type: formData.type,
@@ -83,6 +84,7 @@ function OrganizerApp() {
         max_slots: formData.totalSeats
           ? parseInt(formData.totalSeats, 10)
           : null,
+        cancellation_rules: formData.cancellationRules?.trim() || null,
         date: Math.floor(new Date(formData.dateTime).getTime() / 1000),
         format: formData.format,
         type: formData.type,
@@ -117,6 +119,7 @@ function OrganizerApp() {
         ...full,
         location: full.content,
         totalSeats: full.max_slots,
+        cancellationRules: full.cancellation_rules ?? "",
         dateTime: new Date(full.date * 1000).toISOString().slice(0, 16),
       });
       setSelectedEvent(null);
