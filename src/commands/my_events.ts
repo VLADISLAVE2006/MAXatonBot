@@ -117,9 +117,14 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
         const isPast = event.date * 1000 < Date.now() + 3 * 60 * 60 * 1000;
         const buttons =
             role === "applicant"
-                ? [[Keyboard.button.callback("❌ Отменить запись", `cancel:${event.id}`)], [backToMyEvents]]
+                ? [
+                      ...(isPast && event.closed ? [[Keyboard.button.callback("✍️ Оставить отзыв", `review:${event.id}`)]] : []),
+                      ...(!isPast ? [[Keyboard.button.callback("❌ Отменить запись", `cancel:${event.id}`)]] : []),
+                      [backToMyEvents],
+                  ]
                 : [
                       ...(isPast ? [[Keyboard.button.callback("📊 Статистика", `event_stats:${event.id}`)]] : []),
+                      ...(isPast && !event.closed ? [[Keyboard.button.callback("🔒 Закрыть мероприятие", `close_event:${event.id}`)]] : []),
                       [Keyboard.button.callback("📲 QR-код посещаемости", `event_qr:${event.id}`)],
                       [backToMyEvents],
                   ];
@@ -130,6 +135,29 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
     } catch {
         await ctx.editMessage({
             text: "Не удалось загрузить информацию о мероприятии.",
+            attachments: [Keyboard.inlineKeyboard([[backToMyEvents]])],
+        });
+    }
+    return true;
+}
+
+export async function handleCloseEventCallback(ctx: AppContext): Promise<boolean> {
+    const payload = ctx.callback?.payload;
+    if (!payload?.startsWith("close_event:")) return false;
+
+    const eventId = parseInt(payload.replace("close_event:", ""), 10);
+    if (isNaN(eventId)) return false;
+
+    const token = getToken(ctx.user!.user_id) ?? "";
+    try {
+        await api.events.closeEvent(eventId, token);
+        await ctx.editMessage({
+            text: "🔒 Мероприятие закрыто. Участники теперь могут оставлять отзывы.",
+            attachments: [Keyboard.inlineKeyboard([[backToMyEvents]])],
+        });
+    } catch {
+        await ctx.editMessage({
+            text: "Не удалось закрыть мероприятие.",
             attachments: [Keyboard.inlineKeyboard([[backToMyEvents]])],
         });
     }
@@ -166,12 +194,16 @@ export async function handleEventStatsCallback(ctx: AppContext): Promise<boolean
     const token = getToken(ctx.user!.user_id) ?? "";
     try {
         const stats = await api.events.getEventStats(eventId, token);
+        const ratingLine = stats.reviews_count > 0
+            ? `⭐ Рейтинг: ${stats.average_rating.toFixed(1)} (${stats.reviews_count} отзывов)\n`
+            : "";
         await ctx.editMessage({
             text:
                 `📊 Статистика мероприятия\n\n` +
                 `👥 Записалось: ${stats.total_registered}\n` +
                 `✅ Пришло: ${stats.total_attended}\n` +
-                `📈 Явка: ${stats.percentage.toFixed(1)}%`,
+                `📈 Явка: ${stats.percentage.toFixed(1)}%\n` +
+                ratingLine,
             attachments: [Keyboard.inlineKeyboard([[backToMyEvents]])],
         });
     } catch (error) {

@@ -112,6 +112,7 @@ export const api = {
                 updated_at: number;
                 registered_count: number;
                 is_registered: boolean;
+                closed: boolean;
             }>(`/api/events/${id}`, {
                 method: "GET",
                 token,
@@ -171,10 +172,27 @@ export const api = {
                 token,
             }),
         getEventStats: (id: number, token: string) =>
-            _fetch<{ total_registered: number; total_attended: number; percentage: number }>(
+            _fetch<{ total_registered: number; total_attended: number; percentage: number; reviews_count: number; average_rating: number }>(
                 `/api/events/${id}/stats`,
                 { method: "GET", token },
             ),
+        getEventAttendees: (id: number, token: string) =>
+            _fetch<{ user_id: number; full_name: string; registered_at: number; attended: boolean }[]>(
+                `/api/events/${id}/attendees`,
+                { method: "GET", token },
+            ),
+        closeEvent: (id: number, token: string) =>
+            _fetch<{ status: string }>(`/api/events/${id}/close`, {
+                method: "POST",
+                token,
+            }),
+        addReview: (id: number, rating: number, comment: string | undefined, token: string) =>
+            _fetch<{ status: string }>(`/api/events/${id}/review`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ rating, ...(comment ? { comment } : {}) }),
+                token,
+            }),
         createEvent: (
             data: {
                 title: string;
