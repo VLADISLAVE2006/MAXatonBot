@@ -22,7 +22,7 @@ async function sendReminders(bot: Bot<AppContext>) {
             await bot.api.sendMessageToUser(
                 reminder.user_id,
                 `🔔 Напоминание!\n\n` +
-                    `Завтра состоится мероприятие, на которое вы записаны:\n\n` +
+                    `Скоро состоится мероприятие, на которое вы записаны:\n\n` +
                     `📌 ${reminder.event_title}\n` +
                     `📅 ${formatDate(reminder.event_date)}`,
             );

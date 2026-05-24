@@ -5,7 +5,7 @@ import { startRegistration } from "@/flows/registration";
 import { api } from "@/api";
 import { handleMenuCallback } from "./menu";
 import { handleHubEventsCallback, handleRegisterCallback } from "./events";
-import { handleHubMyEventsCallback, handleCancelRegistrationCallback } from "./my_events";
+import { handleHubMyEventsCallback, handleCancelRegistrationCallback, handleEventStatsCallback, handleQrCallback } from "./my_events";
 import { handleHubNotificationsCallback } from "./notifications";
 
 export type CallbackHandler = (ctx: AppContext) => boolean | Promise<boolean>;
@@ -28,5 +28,5 @@ export function initCommands(bot: Bot<AppContext>) {
 }
 
 export function collectCommandCallbackHandlers(): CallbackHandler[] {
-    return [handleMenuCallback, handleHubEventsCallback, handleRegisterCallback, handleHubMyEventsCallback, handleCancelRegistrationCallback, handleHubNotificationsCallback];
+    return [handleMenuCallback, handleHubEventsCallback, handleRegisterCallback, handleHubMyEventsCallback, handleCancelRegistrationCallback, handleEventStatsCallback, handleQrCallback, handleHubNotificationsCallback];
 }

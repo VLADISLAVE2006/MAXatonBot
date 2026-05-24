@@ -1,11 +1,19 @@
+import QRCode from "qrcode";
 import { api } from "@/api";
 import { type AppContext, getToken } from "@/context";
 import { env } from "@/env";
 import { buildEventDetailText, formatDate, formatSlots } from "@/utils/helpers";
 import { Keyboard } from "@maxhub/max-bot-api";
-import { backToHub, backToMyEvents } from "./menu";
+import { backToHub, backToMyEvents, toHubNew } from "./menu";
 
-type Registration = { id: number; event_id: number; event_title: string; event_date: number; code: string; registered_at: number };
+type Registration = {
+    id: number;
+    event_id: number;
+    event_title: string;
+    event_date: number;
+    code: string;
+    registered_at: number;
+};
 type OrganizerEvent = { id: number; title: string; date: number; max_slots: number | null; registered_count: number };
 
 export function prepareRegistrationsContent(registrations: Registration[]) {
@@ -59,7 +67,12 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
                         text: "У вас ещё нет созданных мероприятий.",
                         attachments: [
                             Keyboard.inlineKeyboard([
-                                [Keyboard.button.link("Создать мероприятие", `${env.CATALOG_URL}/organizer?token=${token}`)],
+                                [
+                                    Keyboard.button.link(
+                                        "Создать мероприятие",
+                                        `${env.CATALOG_URL}/organizer?token=${token}`,
+                                    ),
+                                ],
                                 [backToHub],
                             ]),
                         ],
@@ -68,16 +81,19 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
                 }
 
                 const { list, lines } = prepareOrganizerEventsContent(events);
-                const numberButtons = list.map((e, i) =>
-                    Keyboard.button.callback(`${i + 1}`, `hub_my_event:${e.id}`),
-                );
+                const numberButtons = list.map((e, i) => Keyboard.button.callback(`${i + 1}`, `hub_my_event:${e.id}`));
 
                 await ctx.editMessage({
                     text: `📋 Мои мероприятия:\n\n${lines}`,
                     attachments: [
                         Keyboard.inlineKeyboard([
                             numberButtons,
-                            [Keyboard.button.link("Управлять мероприятиями", `${env.CATALOG_URL}/organizer?token=${token}`)],
+                            [
+                                Keyboard.button.link(
+                                    "Управлять мероприятиями",
+                                    `${env.CATALOG_URL}/organizer?token=${token}`,
+                                ),
+                            ],
                             [backToHub],
                         ]),
                     ],
@@ -97,18 +113,71 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
 
     try {
         const event = await api.events.getEventById(eventId, token);
+        const role = ctx.user!.role;
+        const isPast = event.date * 1000 < Date.now() + 3 * 60 * 60 * 1000;
+        const buttons =
+            role === "applicant"
+                ? [[Keyboard.button.callback("❌ Отменить запись", `cancel:${event.id}`)], [backToMyEvents]]
+                : [
+                      ...(isPast ? [[Keyboard.button.callback("📊 Статистика", `event_stats:${event.id}`)]] : []),
+                      [Keyboard.button.callback("📲 QR-код посещаемости", `event_qr:${event.id}`)],
+                      [backToMyEvents],
+                  ];
         await ctx.editMessage({
             text: buildEventDetailText(event),
-            attachments: [
-                Keyboard.inlineKeyboard([
-                    [Keyboard.button.callback("❌ Отменить запись", `cancel:${event.id}`)],
-                    [backToMyEvents],
-                ]),
-            ],
+            attachments: [Keyboard.inlineKeyboard(buttons)],
         });
     } catch {
         await ctx.editMessage({
             text: "Не удалось загрузить информацию о мероприятии.",
+            attachments: [Keyboard.inlineKeyboard([[backToMyEvents]])],
+        });
+    }
+    return true;
+}
+
+export async function handleQrCallback(ctx: AppContext): Promise<boolean> {
+    const payload = ctx.callback?.payload;
+    if (!payload?.startsWith("event_qr:")) return false;
+
+    const eventId = parseInt(payload.replace("event_qr:", ""), 10);
+    if (isNaN(eventId)) return false;
+
+    try {
+        const deeplink = `${env.BOT_LINK}?start=attend_${eventId}`;
+        const qrBuffer = await QRCode.toBuffer(deeplink);
+        const imageAttachment = await ctx.api.uploadImage({ source: qrBuffer });
+        await ctx.reply("📲 QR-код для отметки посещаемости:", {
+            attachments: [imageAttachment.toJson(), Keyboard.inlineKeyboard([[toHubNew]])],
+        });
+    } catch {
+        await ctx.reply("Не удалось сгенерировать QR-код.");
+    }
+    return true;
+}
+
+export async function handleEventStatsCallback(ctx: AppContext): Promise<boolean> {
+    const payload = ctx.callback?.payload;
+    if (!payload?.startsWith("event_stats:")) return false;
+
+    const eventId = parseInt(payload.replace("event_stats:", ""), 10);
+    if (isNaN(eventId)) return false;
+
+    const token = getToken(ctx.user!.user_id) ?? "";
+    try {
+        const stats = await api.events.getEventStats(eventId, token);
+        await ctx.editMessage({
+            text:
+                `📊 Статистика мероприятия\n\n` +
+                `👥 Записалось: ${stats.total_registered}\n` +
+                `✅ Пришло: ${stats.total_attended}\n` +
+                `📈 Явка: ${stats.percentage.toFixed(1)}%`,
+            attachments: [Keyboard.inlineKeyboard([[backToMyEvents]])],
+        });
+    } catch (error) {
+        console.error(error);
+        await ctx.editMessage({
+            text: "Не удалось загрузить статистику.",
             attachments: [Keyboard.inlineKeyboard([[backToMyEvents]])],
         });
     }

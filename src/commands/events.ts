@@ -9,7 +9,7 @@ type ShortEvent = { id: number; title: string; date: number; max_slots: number |
 
 export function prepareEventsListContent(events: ShortEvent[]) {
     const upcoming = events
-        .filter((e) => e.date * 1000 >= Date.now())
+        .filter((e) => e.date * 1000 >= Date.now() + 3 * 60 * 60 * 1000)
         .sort((a, b) => a.date - b.date)
         .slice(0, 9);
     const list = upcoming.length > 0 ? upcoming : events.slice(0, 9);

@@ -6,6 +6,7 @@ const envSchema = z.object({
     API_KEY: z.string(),
     API_URL: z.url(),
     CATALOG_URL: z.url(),
+    BOT_LINK: z.url(),
 });
 
 export type Env = z.infer<typeof envSchema>;
