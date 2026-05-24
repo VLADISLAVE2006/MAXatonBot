@@ -38,7 +38,8 @@ type Event struct {
 	CreatedAt         int64   `json:"created_at"` // unix timestamp
 	UpdatedAt         int64   `json:"updated_at"` // unix timestamp
 	RegisteredCount   int     `json:"registered_count"`
-    IsRegistered bool `json:"is_registered"`
+	IsRegistered      bool    `json:"is_registered"`
+	Closed            bool    `json:"closed"`
 }
 
 type ShortEvent struct {
@@ -116,20 +117,21 @@ func HandleGetEventByID(w http.ResponseWriter, r *http.Request) {
 
     var e Event
     err = db.DB.QueryRow(`
-        SELECT 
-            e.id, e.title, e.description, e.content, 
+        SELECT
+            e.id, e.title, e.description, e.content,
             e.max_slots, e.cancellation_rules,
             EXTRACT(epoch FROM e.date)::bigint AS date,
             e.format, e.type, e.created_by,
             EXTRACT(epoch FROM e.created_at)::bigint AS created_at,
             EXTRACT(epoch FROM e.updated_at)::bigint AS updated_at,
             COUNT(r.id) AS registered_count,
-            EXISTS(SELECT 1 FROM registrations WHERE user_id = $1 AND event_id = e.id) AS is_registered
+            EXISTS(SELECT 1 FROM registrations WHERE user_id = $1 AND event_id = e.id) AS is_registered,
+            e.closed
         FROM events e
         LEFT JOIN registrations r ON e.id = r.event_id
         WHERE e.id = $2
         GROUP BY e.id, e.title, e.description, e.content, e.max_slots, e.cancellation_rules,
-                 e.date, e.format, e.type, e.created_by, e.created_at, e.updated_at
+                 e.date, e.format, e.type, e.created_by, e.created_at, e.updated_at, e.closed
     `, userID, id).Scan(
         &e.ID, &e.Title, &e.Description, &e.Content,
         &e.MaxSlots, &e.CancellationRules,
@@ -138,6 +140,7 @@ func HandleGetEventByID(w http.ResponseWriter, r *http.Request) {
         &e.CreatedAt, &e.UpdatedAt,
         &e.RegisteredCount,
         &e.IsRegistered,
+        &e.Closed,
     )
     if err == sql.ErrNoRows {
         writeError(w, http.StatusNotFound, "event not found")
