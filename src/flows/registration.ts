@@ -133,7 +133,7 @@ export async function handleRegistrationMessage(ctx: AppContext): Promise<boolea
                 mergeData(userId, { name: text });
                 resetSession(userId);
                 await ctx.reply(`✅ Спасибо, ${text.split(" ")[0]}! Вы успешно зарегистрированы.`, {
-                    attachments: [hubKeyboard()],
+                    attachments: [hubKeyboard(ctx.user?.role)],
                 });
                 return true;
             } catch (error) {
