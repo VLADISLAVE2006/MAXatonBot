@@ -19,6 +19,14 @@ function formatDate(timestamp: number): string {
     });
 }
 
+export function formatSlots(maxSlots: number | null, registeredCount: number): string {
+    if (maxSlots == null) return "";
+    const free = maxSlots - registeredCount;
+    if (free <= 0) return " · ❌ мест нет";
+    if (free <= 5) return ` · ⚠️ осталось: ${free} из ${maxSlots}`;
+    return ` · свободно: ${free} из ${maxSlots}`;
+}
+
 export async function eventsCommand(ctx: AppContext) {
     if (!ctx.user) return;
     const token = getToken(ctx.user.user_id) ?? "";
@@ -37,12 +45,9 @@ export async function eventsCommand(ctx: AppContext) {
 
         const list = upcoming.length > 0 ? upcoming : events.slice(0, 9);
 
-        const lines = list.map((e, i) => {
-            const seats = e.max_slots != null
-                ? ` (${e.max_slots - e.registered_count}/${e.max_slots} мест)`
-                : "";
-            return `${i + 1}. ${e.title} — ${formatDate(e.date)}${seats}`;
-        }).join("\n");
+        const lines = list.map((e, i) =>
+            `${i + 1}. ${e.title} — ${formatDate(e.date)}${formatSlots(e.max_slots, e.registered_count)}`
+        ).join("\n");
 
         const numberButtons = list.map((e, i) => Keyboard.button.callback(`${i + 1}`, `event:${e.id}`));
 
@@ -76,7 +81,7 @@ export async function handleEventsCallback(ctx: AppContext): Promise<boolean> {
             `${event.description}\n\n` +
             `📅 ${formatDate(event.date)}\n` +
             `📍 ${event.content}\n` +
-            `👥 Мест: ${event.max_slots ?? "∞"}\n` +
+            `👥 Мест: ${event.max_slots == null ? "∞" : event.max_slots - event.registered_count <= 0 ? "нет мест" : `свободно ${event.max_slots - event.registered_count} из ${event.max_slots}`}\n` +
             `🌐 ${event.format === "online" ? "Онлайн" : "Оффлайн"}\n` +
             `🏷️ ${TYPE_LABELS[event.type] ?? event.type}`;
 

@@ -2,6 +2,7 @@ import { api } from "@/api";
 import { AppContext, getToken } from "@/context";
 import { env } from "@/env";
 import { Keyboard } from "@maxhub/max-bot-api";
+import { formatSlots } from "./events";
 
 const TYPE_LABELS: Record<string, string> = {
     hackathon: "Хакатон",
@@ -76,12 +77,9 @@ export async function myEventsCommand(ctx: AppContext) {
                     .slice(0, 9);
 
                 const lines = list
-                    .map((e, i) => {
-                        const seats = e.max_slots != null
-                            ? ` (${e.max_slots - e.registered_count}/${e.max_slots} мест)`
-                            : "";
-                        return `${i + 1}. ${e.title} — ${formatDate(e.date)}${seats}`;
-                    })
+                    .map((e, i) =>
+                        `${i + 1}. ${e.title} — ${formatDate(e.date)}${formatSlots(e.max_slots, e.registered_count)}`
+                    )
                     .join("\n");
 
                 const numberButtons = list.map((e, i) =>
@@ -128,7 +126,7 @@ export async function handleMyEventsCallback(ctx: AppContext): Promise<boolean> 
             `${event.description}\n\n` +
             `📅 ${formatDate(event.date)}\n` +
             `📍 ${event.content}\n` +
-            `👥 Мест: ${event.max_slots ?? "∞"}\n` +
+            `👥 Мест: ${event.max_slots == null ? "∞" : event.max_slots - event.registered_count <= 0 ? "нет мест" : `свободно ${event.max_slots - event.registered_count} из ${event.max_slots}`}\n` +
             `🌐 ${event.format === "online" ? "Онлайн" : "Оффлайн"}\n` +
             `🏷️ ${TYPE_LABELS[event.type] ?? event.type}`;
 
