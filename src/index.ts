@@ -1,10 +1,11 @@
-import { Bot, Keyboard } from "@maxhub/max-bot-api";
+import { Bot } from "@maxhub/max-bot-api";
 import "dotenv/config";
 import { env } from "@/env";
 import { initFlows } from "@/flows";
 import { api } from "@/api";
 import { AppContext, getSession, setSession, setRole, setToken, setFullName, setStep } from "@/context";
 import { initCommands } from "@/commands";
+import { initReminders } from "@/reminders";
 
 const bot = new Bot<AppContext>(env.BOT_TOKEN!, { contextType: AppContext });
 
@@ -41,5 +42,6 @@ bot.use(async (ctx, next) => {
 
 initCommands(bot);
 initFlows(bot);
+initReminders(bot);
 
 bot.start();

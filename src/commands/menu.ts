@@ -3,12 +3,13 @@ import { Keyboard } from "@maxhub/max-bot-api";
 
 const HUB_TEXT = "Главное меню. Выберите раздел:";
 
-const hubKeyboard = () =>
+export const hubKeyboard = () =>
     Keyboard.inlineKeyboard([
         [
             Keyboard.button.callback("📅 Мероприятия", "menu:events"),
             Keyboard.button.callback("📋 Мои записи", "menu:my_events"),
         ],
+        [Keyboard.button.callback("🔔 Уведомления", "menu:notifications")],
     ]);
 
 export const backToHub = Keyboard.button.callback("🔙 Главное меню", "menu:back");

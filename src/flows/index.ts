@@ -1,7 +1,7 @@
 import type { Bot } from "@maxhub/max-bot-api";
 import { sendHub } from "@/commands/menu";
 import { collectCommandCallbackHandlers } from "@/commands";
-import { getSession, type AppContext } from "@/context";
+import { getSession, getToken, type AppContext } from "@/context";
 import { handleRegistrationCallback, handleRegistrationMessage, startRegistration } from "./registration";
 import { handleRegisterDeeplink } from "@/commands/register";
 
@@ -39,23 +39,35 @@ export function initFlows(bot: Bot<AppContext>) {
             }
         }
 
-        if (text && !session?.flow) {
-            await sendHub(ctx);
-            return;
+        if (text) {
+            if (!userId || !getToken(userId)) {
+                await startRegistration(ctx);
+                return;
+            }
+            if (!session?.flow) {
+                await sendHub(ctx);
+                return;
+            }
         }
 
         return next();
     });
 
     bot.on("message_callback", async (ctx, next) => {
-        for (const handler of collectCommandCallbackHandlers()) {
-            if (await handler(ctx)) {
+        for (const flow of flows) {
+            if (await flow.onMessageCallback?.(ctx)) {
                 return;
             }
         }
 
-        for (const flow of flows) {
-            if (await flow.onMessageCallback?.(ctx)) {
+        const userId = ctx.user?.user_id;
+        if (!userId || !getToken(userId)) {
+            await startRegistration(ctx);
+            return;
+        }
+
+        for (const handler of collectCommandCallbackHandlers()) {
+            if (await handler(ctx)) {
                 return;
             }
         }
