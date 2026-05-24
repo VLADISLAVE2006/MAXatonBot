@@ -129,7 +129,7 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
                       ...(isPast && !event.closed
                           ? [[Keyboard.button.callback("🔒 Закрыть мероприятие", `close_event:${event.id}`)]]
                           : []),
-                      [Keyboard.button.callback("📲 QR-код посещаемости", `event_qr:${event.id}`)],
+                      ...(!event.closed ? [[Keyboard.button.callback("📲 QR-код посещаемости", `event_qr:${event.id}`)]] : []),
                       [backToMyEvents],
                   ];
         await ctx.editMessage({
