@@ -163,6 +163,18 @@ export const api = {
                 method: "DELETE",
                 token,
             }),
+        markAttendance: (id: number, code: string, token: string) =>
+            _fetch<{ status: string }>(`/api/events/${id}/attendance`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code }),
+                token,
+            }),
+        getEventStats: (id: number, token: string) =>
+            _fetch<{ total_registered: number; total_attended: number; percentage: number }>(
+                `/api/events/${id}/stats`,
+                { method: "GET", token },
+            ),
         createEvent: (
             data: {
                 title: string;
