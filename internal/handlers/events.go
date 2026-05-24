@@ -21,6 +21,7 @@ type Registration struct {
 	EventDate    int64  `json:"event_date"`
 	Code         string `json:"code"`
 	RegisteredAt int64  `json:"registered_at"`
+	Attended     bool   `json:"attended"`
 }
 
 type Event struct {
@@ -266,12 +267,12 @@ func HandleMyRegistrations(w http.ResponseWriter, r *http.Request) {
 	userID := claims.UserID
 
 	rows, err := db.DB.Query(`
-        SELECT r.id, r.event_id, e.title, EXTRACT(epoch FROM e.date)::bigint, r.code, EXTRACT(epoch FROM r.registered_at)::bigint
-        FROM registrations r
-        JOIN events e ON r.event_id = e.id
-        WHERE r.user_id = $1
-        ORDER BY e.date ASC
-    `, userID)
+		SELECT r.id, r.event_id, e.title, EXTRACT(epoch FROM e.date)::bigint, r.code, EXTRACT(epoch FROM r.registered_at)::bigint, r.attended
+		FROM registrations r
+		JOIN events e ON r.event_id = e.id
+		WHERE r.user_id = $1
+		ORDER BY e.date ASC
+	`, userID)
 	if err != nil {
 		log.Printf("MyRegistrations DB error: %v", err)
 		writeError(w, http.StatusInternalServerError, "database error")
@@ -282,7 +283,7 @@ func HandleMyRegistrations(w http.ResponseWriter, r *http.Request) {
 	registrations := []Registration{}
 	for rows.Next() {
 		var reg Registration
-		if err := rows.Scan(&reg.ID, &reg.EventID, &reg.EventTitle, &reg.EventDate, &reg.Code, &reg.RegisteredAt); err != nil {
+		if err := rows.Scan(&reg.ID, &reg.EventID, &reg.EventTitle, &reg.EventDate, &reg.Code, &reg.RegisteredAt, &reg.Attended); err != nil {
 			log.Printf("MyRegistrations scan error: %v", err)
 			continue
 		}
@@ -362,6 +363,78 @@ func HandleMarkRemindersSent(w http.ResponseWriter, r *http.Request) {
 
     w.WriteHeader(http.StatusOK)
     json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// 
+type MarkAttendanceRequest struct {
+    Code string `json:"code"`
+}
+
+// HandleMarkAttendance подтверждает посещение мероприятия по коду записи
+func HandleMarkAttendance(w http.ResponseWriter, r *http.Request) {
+    claims := middleware.GetClaims(r)
+    userID := claims.UserID
+
+    vars := mux.Vars(r)
+    eventID, err := strconv.Atoi(vars["id"])
+    if err != nil {
+        writeError(w, http.StatusBadRequest, "invalid event id")
+        return
+    }
+
+    var req MarkAttendanceRequest
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        writeError(w, http.StatusBadRequest, "invalid JSON")
+        return
+    }
+    if req.Code == "" {
+        writeError(w, http.StatusBadRequest, "code is required")
+        return
+    }
+
+    // Проверяем, что регистрация существует, принадлежит пользователю и код совпадает
+    var registrationID int
+    var attended bool
+    err = db.DB.QueryRow(`
+        SELECT id, attended FROM registrations 
+        WHERE user_id = $1 AND event_id = $2 AND code = $3
+    `, userID, eventID, req.Code).Scan(&registrationID, &attended)
+    if err == sql.ErrNoRows {
+        writeError(w, http.StatusNotFound, "registration not found or invalid code")
+        return
+    }
+    if err != nil {
+        log.Printf("MarkAttendance DB error: %v", err)
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
+    if attended {
+        writeError(w, http.StatusConflict, "already marked as attended")
+        return
+    }
+
+    // Проверяем, что мероприятие уже началось (не в будущем)
+    var eventDate time.Time
+    err = db.DB.QueryRow("SELECT date FROM events WHERE id = $1", eventID).Scan(&eventDate)
+    if err != nil {
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
+    if eventDate.After(time.Now()) {
+        writeError(w, http.StatusBadRequest, "event has not started yet")
+        return
+    }
+
+    // Отмечаем как посещённое
+    _, err = db.DB.Exec("UPDATE registrations SET attended = true WHERE id = $1", registrationID)
+    if err != nil {
+        log.Printf("MarkAttendance update error: %v", err)
+        writeError(w, http.StatusInternalServerError, "failed to mark attendance")
+        return
+    }
+
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(map[string]string{"status": "attendance confirmed"})
 }
 
 
@@ -645,4 +718,57 @@ func HandleDeleteEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 
+//просмотр статистики
+type EventStats struct {
+    TotalRegistered int `json:"total_registered"`
+    TotalAttended   int `json:"total_attended"`
+    Percentage      float64 `json:"percentage"`
+}
 
+func HandleEventStats(w http.ResponseWriter, r *http.Request) {
+    claims := middleware.GetClaims(r)
+    userID := claims.UserID
+
+    id, err := strconv.Atoi(mux.Vars(r)["id"])
+    if err != nil {
+        writeError(w, http.StatusBadRequest, "invalid event id")
+        return
+    }
+
+    // Проверяем, что организатор является создателем мероприятия
+    var createdBy int64
+    err = db.DB.QueryRow("SELECT created_by FROM events WHERE id = $1", id).Scan(&createdBy)
+    if err == sql.ErrNoRows {
+        writeError(w, http.StatusNotFound, "event not found")
+        return
+    }
+    if err != nil {
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
+    if createdBy != userID {
+        writeError(w, http.StatusForbidden, "only event creator can view stats")
+        return
+    }
+
+    var stats EventStats
+    err = db.DB.QueryRow(`
+        SELECT 
+            COUNT(*) AS total_registered,
+            SUM(CASE WHEN attended THEN 1 ELSE 0 END) AS total_attended
+        FROM registrations
+        WHERE event_id = $1
+    `, id).Scan(&stats.TotalRegistered, &stats.TotalAttended)
+    if err != nil {
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
+    if stats.TotalRegistered > 0 {
+        stats.Percentage = float64(stats.TotalAttended) / float64(stats.TotalRegistered) * 100
+    } else {
+        stats.Percentage = 0
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(stats)
+}

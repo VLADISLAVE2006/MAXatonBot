@@ -88,7 +88,8 @@ func InitDB() error {
 		event_id      INT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
 		registered_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 		code          TEXT NOT NULL UNIQUE,
-		reminder_sent BOOLEAN DEFAULT false
+		reminder_sent BOOLEAN DEFAULT false,
+		attended      BOOLEAN DEFAULT false
 	);
 	`
 	_, err = DB.Exec(createRegistrationsTableSQL)
