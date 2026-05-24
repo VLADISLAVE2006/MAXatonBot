@@ -172,7 +172,6 @@ const EventModal = ({ event, onClose }) => {
               <div style={styles.detailItem}>
                 <span style={styles.detailIcon}>👥</span>
                 <span>
-                  <strong>Места:</strong>{" "}
                   {event.totalSeats != null ? (
                     <span
                       style={
@@ -183,7 +182,7 @@ const EventModal = ({ event, onClose }) => {
                           : styles.normalSeats
                       }
                     >
-                      {event.remainingSeats}/{event.totalSeats}
+                      {event.remainingSeats <= 0 ? 'Мест нет' : `Свободно: ${event.remainingSeats} из ${event.totalSeats}`}
                     </span>
                   ) : (
                     <span style={styles.normalSeats}>∞</span>

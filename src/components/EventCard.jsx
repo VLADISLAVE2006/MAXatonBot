@@ -12,7 +12,7 @@ const EventCard = ({ event, onClick }) => {
       >
         {freeSlots != null && (
           <div className={`${styles.slotsBadge} ${freeSlots === 0 ? styles.full : freeSlots <= 5 ? styles.low : ''}`}>
-            {freeSlots === 0 ? 'Мест нет' : `${freeSlots}/${event.max_slots} мест`}
+            {freeSlots === 0 ? 'Мест нет' : `Свободно: ${freeSlots} из ${event.max_slots}`}
           </div>
         )}
         <div className={styles.overlay}>
