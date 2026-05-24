@@ -55,6 +55,12 @@ func main() {
 	router.HandleFunc("/api/events/{id}/register", middleware.UserAuth(handlers.HandleRegisterEvent)).Methods("POST")
 	router.HandleFunc("/api/events/{id}/register", middleware.UserAuth(handlers.HandleCancelEvent)).Methods("DELETE")
 	router.HandleFunc("/api/user/registrations", middleware.UserAuth(handlers.HandleMyRegistrations)).Methods("GET")
+	//настройка уведомлений
+	router.HandleFunc("/api/user/notifications", middleware.UserAuth(handlers.HandleGetNotifications)).Methods("GET")
+	router.HandleFunc("/api/user/notifications", middleware.UserAuth(handlers.HandleUpdateNotifications)).Methods("POST")
+	//отправка уведомлений
+	router.HandleFunc("/api/reminders/pending", middleware.APIAuth(handlers.HandleGetPendingReminders)).Methods("GET")
+	router.HandleFunc("/api/reminders/mark-sent", middleware.APIAuth(handlers.HandleMarkRemindersSent)).Methods("POST")
 
 	//для организатора
 	router.HandleFunc("/api/events", middleware.OrganizerAuth(handlers.HandleCreateEvent)).Methods("POST")
@@ -78,3 +84,4 @@ func main() {
 		log.Fatal(err)
 	}
 }
+

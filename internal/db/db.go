@@ -48,7 +48,8 @@ func InitDB() error {
         role            TEXT NOT NULL DEFAULT 'applicant',
         consent_given   BOOLEAN NOT NULL DEFAULT false,
         consent_date    TIMESTAMP WITH TIME ZONE,
-        consent_version TEXT
+        consent_version TEXT,
+		notifications_enabled BOOLEAN DEFAULT true
     );`
 	_, err = DB.Exec(createTableSQL)
 	if err != nil {
@@ -86,7 +87,8 @@ func InitDB() error {
 		user_id       BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
 		event_id      INT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
 		registered_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-		code          TEXT NOT NULL UNIQUE
+		code          TEXT NOT NULL UNIQUE,
+		reminder_sent BOOLEAN DEFAULT false
 	);
 	`
 	_, err = DB.Exec(createRegistrationsTableSQL)

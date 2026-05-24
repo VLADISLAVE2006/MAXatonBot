@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
-
+	"github.com/lib/pq"
 	"github.com/gorilla/mux"
 )
 
@@ -289,6 +289,78 @@ func HandleMyRegistrations(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(registrations)
 }
 
+
+// структура для формирования напоминаний
+type PendingReminder struct {
+    RegistrationID int    `json:"registration_id"`
+    UserID         int64  `json:"user_id"`
+    EventID        int    `json:"event_id"`
+    EventTitle     string `json:"event_title"`
+    EventDate      int64  `json:"event_date"` // unix timestamp
+}
+
+// HandleGetPendingReminders возвращает список напоминаний, которые нужно отправить за день до мероприятия
+func HandleGetPendingReminders(w http.ResponseWriter, r *http.Request) {
+    rows, err := db.DB.Query(`
+        SELECT r.id, r.user_id, e.id, e.title, EXTRACT(epoch FROM e.date)::bigint
+        FROM registrations r
+        JOIN events e ON r.event_id = e.id
+        JOIN users u ON r.user_id = u.user_id
+        WHERE DATE(e.date) = DATE(NOW() + INTERVAL '1 day')
+          AND r.reminder_sent = false
+          AND COALESCE(u.notifications_enabled, true) = true
+    `)
+    if err != nil {
+        log.Printf("GetPendingReminders DB error: %v", err)
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
+    defer rows.Close()
+
+    reminders := []PendingReminder{}
+    for rows.Next() {
+        var r PendingReminder
+        if err := rows.Scan(&r.RegistrationID, &r.UserID, &r.EventID, &r.EventTitle, &r.EventDate); err != nil {
+            log.Printf("scan error: %v", err)
+            continue
+        }
+        reminders = append(reminders, r)
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(reminders)
+}
+
+type MarkSentRequest struct {
+    RegistrationIDs []int `json:"registration_ids"`
+}
+
+// HandleMarkRemindersSent отмечает напоминания как отправленные
+func HandleMarkRemindersSent(w http.ResponseWriter, r *http.Request) {
+    var req MarkSentRequest
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        writeError(w, http.StatusBadRequest, "invalid JSON")
+        return
+    }
+    if len(req.RegistrationIDs) == 0 {
+        writeError(w, http.StatusBadRequest, "registration_ids is required")
+        return
+    }
+
+    // Используем ANY для массового обновления
+    query := `UPDATE registrations SET reminder_sent = true WHERE id = ANY($1::int[])`
+    _, err := db.DB.Exec(query, pq.Array(req.RegistrationIDs))
+    if err != nil {
+        log.Printf("MarkRemindersSent DB error: %v", err)
+        writeError(w, http.StatusInternalServerError, "failed to update")
+        return
+    }
+
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+
 // generateRegistrationCode создаёт случайный 8-значный код
 func generateRegistrationCode() string {
 	const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -298,6 +370,26 @@ func generateRegistrationCode() string {
 	}
 	return string(b)
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // для организатора
 // HandleCreateEvent создаёт новое мероприятие (только для организатора)
@@ -547,3 +639,6 @@ func HandleDeleteEvent(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "event deleted"})
 }
+
+
+

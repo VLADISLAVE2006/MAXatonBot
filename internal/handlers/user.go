@@ -173,6 +173,46 @@ func HandleGetMe(w http.ResponseWriter, r *http.Request) {
 }
 
 
+// HandleNotifications – получение или изменение настроек уведомлений пользователя
+type NotificationsRequest struct {
+    Enabled bool `json:"enabled"`
+}
+
+func HandleGetNotifications(w http.ResponseWriter, r *http.Request) {
+    claims := middleware.GetClaims(r)
+    userID := claims.UserID
+
+    var enabled bool
+    err := db.DB.QueryRow("SELECT COALESCE(notifications_enabled, true) FROM users WHERE user_id = $1", userID).Scan(&enabled)
+    if err != nil {
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]bool{"enabled": enabled})
+}
+
+func HandleUpdateNotifications(w http.ResponseWriter, r *http.Request) {
+    claims := middleware.GetClaims(r)
+    userID := claims.UserID
+
+    var req NotificationsRequest
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        writeError(w, http.StatusBadRequest, "invalid JSON")
+        return
+    }
+
+    _, err := db.DB.Exec("UPDATE users SET notifications_enabled = $1 WHERE user_id = $2", req.Enabled, userID)
+    if err != nil {
+        writeError(w, http.StatusInternalServerError, "failed to update notification settings")
+        return
+    }
+
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
 
 // AdminCreateOrganizerRequest структура запроса от админа
 type AdminCreateOrganizerRequest struct {
