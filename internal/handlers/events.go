@@ -45,6 +45,8 @@ type ShortEvent struct {
 	Title           string `json:"title"`
 	Description     string `json:"description"`
 	Date            int64  `json:"date"`
+	Format          string `json:"format"`
+	Type            string `json:"type"`
 	MaxSlots        *int   `json:"max_slots"`
 	RegisteredCount int    `json:"registered_count"`
 }
@@ -69,11 +71,13 @@ func HandleGetEvents(w http.ResponseWriter, r *http.Request) {
             e.title,
             e.description,
             EXTRACT(epoch FROM e.date)::bigint AS date,
+            e.format,
+            e.type,
             e.max_slots,
             COUNT(r.id) AS registered_count
         FROM events e
         LEFT JOIN registrations r ON e.id = r.event_id
-        GROUP BY e.id, e.title, e.description, e.date, e.max_slots
+        GROUP BY e.id, e.title, e.description, e.date, e.format, e.type, e.max_slots
         ORDER BY e.created_at DESC
     `)
 	if err != nil {
@@ -86,7 +90,7 @@ func HandleGetEvents(w http.ResponseWriter, r *http.Request) {
 	events := []ShortEvent{}
 	for rows.Next() {
 		var e ShortEvent
-		if err := rows.Scan(&e.ID, &e.Title, &e.Description, &e.Date, &e.MaxSlots, &e.RegisteredCount); err != nil {
+		if err := rows.Scan(&e.ID, &e.Title, &e.Description, &e.Date, &e.Format, &e.Type, &e.MaxSlots, &e.RegisteredCount); err != nil {
 			log.Printf("HandleGetEvents scan error: %v", err)
 			continue
 		}
@@ -473,11 +477,11 @@ func HandleGetOrganizerEvents(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.DB.Query(`
         SELECT
             e.id, e.title, e.description, EXTRACT(epoch FROM e.date)::bigint AS date,
-            e.max_slots, COUNT(r.id) AS registered_count
+            e.format, e.type, e.max_slots, COUNT(r.id) AS registered_count
         FROM events e
         LEFT JOIN registrations r ON e.id = r.event_id
         WHERE e.created_by = $1
-        GROUP BY e.id, e.title, e.description, e.date, e.max_slots
+        GROUP BY e.id, e.title, e.description, e.date, e.format, e.type, e.max_slots
         ORDER BY e.created_at DESC
     `, userID)
 	if err != nil {
@@ -490,7 +494,7 @@ func HandleGetOrganizerEvents(w http.ResponseWriter, r *http.Request) {
 	events := []ShortEvent{}
 	for rows.Next() {
 		var e ShortEvent
-		if err := rows.Scan(&e.ID, &e.Title, &e.Description, &e.Date, &e.MaxSlots, &e.RegisteredCount); err != nil {
+		if err := rows.Scan(&e.ID, &e.Title, &e.Description, &e.Date, &e.Format, &e.Type, &e.MaxSlots, &e.RegisteredCount); err != nil {
 			log.Printf("HandleGetOrganizerEvents scan error: %v", err)
 			continue
 		}
