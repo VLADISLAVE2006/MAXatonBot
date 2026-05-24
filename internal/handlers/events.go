@@ -328,7 +328,8 @@ func HandleGetPendingReminders(w http.ResponseWriter, r *http.Request) {
         FROM registrations r
         JOIN events e ON r.event_id = e.id
         JOIN users u ON r.user_id = u.user_id
-        WHERE DATE(e.date) = DATE(NOW() + INTERVAL '1 day')
+        WHERE e.date > NOW()
+          AND e.date <= NOW() + INTERVAL '36 hours'
           AND r.reminder_sent = false
           AND COALESCE(u.notifications_enabled, true) = true
     `)
