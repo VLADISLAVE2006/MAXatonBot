@@ -8,7 +8,13 @@ const FilterPanel = ({ filters, setFilters }) => {
     useEffect(() => {
         if (isOpen) {
             setTempFilters({ format: [...filters.format], type: [...filters.type] });
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'auto';
         }
+        return () => {
+            document.body.style.overflow = 'auto';
+        };
     }, [isOpen, filters.format, filters.type]);
 
     useEffect(() => {
@@ -88,11 +94,20 @@ const FilterPanel = ({ filters, setFilters }) => {
             fontSize: "11px",
             marginLeft: "5px",
         },
+        modalOverlay: {
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 0.4)",
+            zIndex: 9998,
+        },
         modal: {
             position: "fixed",
-            top: "0",
+            top: "50%",
             left: "50%",
-            transform: "translateX(15%)",
+            transform: "translate(-50%, -50%)",
             background: "white",
             borderRadius: "20px",
             width: "350px",
@@ -105,7 +120,7 @@ const FilterPanel = ({ filters, setFilters }) => {
             justifyContent: "space-between",
             alignItems: "center",
             padding: "15px 20px",
-            borderBottom: "1px solid #eee",
+            borderBottom: "1px solid var(--border-light, #eee)",
         },
         closeBtn: {
             background: "#f0f0f0",
@@ -142,6 +157,7 @@ const FilterPanel = ({ filters, setFilters }) => {
             borderRadius: "40px",
             cursor: "pointer",
             fontSize: "13px",
+            color: "#2c4d6e",
         },
         chipActive: {
             background: "#2c7ab1",
@@ -152,7 +168,7 @@ const FilterPanel = ({ filters, setFilters }) => {
             display: "flex",
             gap: "10px",
             padding: "15px 20px",
-            borderTop: "1px solid #eee",
+            borderTop: "1px solid var(--border-light, #eee)",
         },
         resetBtn: {
             flex: 1,
@@ -162,6 +178,7 @@ const FilterPanel = ({ filters, setFilters }) => {
             border: "none",
             fontSize: "14px",
             background: "#f0f4fa",
+            color: "#4a6f8f",
         },
         applyBtn: {
             flex: 1,
@@ -186,67 +203,68 @@ const FilterPanel = ({ filters, setFilters }) => {
             </button>
 
             {isOpen && (
-                <div
-                    style={styles.modal}
-                    ref={modalRef}>
-                    <div style={styles.modalHeader}>
-                        <h3 style={{ margin: 0 }}>Фильтры</h3>
-                        <button
-                            style={styles.closeBtn}
-                            onClick={() => setIsOpen(false)}>
-                            <i className="fas fa-times"></i>
-                        </button>
-                    </div>
+                <>
+                    <div style={styles.modalOverlay} onClick={() => setIsOpen(false)} />
+                    <div style={styles.modal} ref={modalRef}>
+                        <div style={styles.modalHeader}>
+                            <h3 style={{ margin: 0 }}>Фильтры</h3>
+                            <button
+                                style={styles.closeBtn}
+                                onClick={() => setIsOpen(false)}>
+                                ✕
+                            </button>
+                        </div>
 
-                    <div style={styles.modalBody}>
-                        <div style={styles.section}>
-                            <div style={styles.sectionTitle}>Формат проведения</div>
-                            <div style={styles.chips}>
-                                {formatOptions.map((opt) => (
-                                    <button
-                                        key={opt.value}
-                                        style={{
-                                            ...styles.chip,
-                                            ...(tempFilters.format.includes(opt.value) ? styles.chipActive : {}),
-                                        }}
-                                        onClick={() => toggleTempFormat(opt.value)}>
-                                        {opt.label}
-                                    </button>
-                                ))}
+                        <div style={styles.modalBody}>
+                            <div style={styles.section}>
+                                <div style={styles.sectionTitle}>Формат проведения</div>
+                                <div style={styles.chips}>
+                                    {formatOptions.map((opt) => (
+                                        <button
+                                            key={opt.value}
+                                            style={{
+                                                ...styles.chip,
+                                                ...(tempFilters.format.includes(opt.value) ? styles.chipActive : {}),
+                                            }}
+                                            onClick={() => toggleTempFormat(opt.value)}>
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div style={styles.section}>
+                                <div style={styles.sectionTitle}>Тип мероприятия</div>
+                                <div style={styles.chips}>
+                                    {typeOptions.map((opt) => (
+                                        <button
+                                            key={opt.value}
+                                            style={{
+                                                ...styles.chip,
+                                                ...(tempFilters.type.includes(opt.value) ? styles.chipActive : {}),
+                                            }}
+                                            onClick={() => toggleTempType(opt.value)}>
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
 
-                        <div style={styles.section}>
-                            <div style={styles.sectionTitle}>Тип мероприятия</div>
-                            <div style={styles.chips}>
-                                {typeOptions.map((opt) => (
-                                    <button
-                                        key={opt.value}
-                                        style={{
-                                            ...styles.chip,
-                                            ...(tempFilters.type.includes(opt.value) ? styles.chipActive : {}),
-                                        }}
-                                        onClick={() => toggleTempType(opt.value)}>
-                                        {opt.label}
-                                    </button>
-                                ))}
-                            </div>
+                        <div style={styles.modalFooter}>
+                            <button
+                                style={styles.resetBtn}
+                                onClick={resetTempFilters}>
+                                Сбросить все
+                            </button>
+                            <button
+                                style={styles.applyBtn}
+                                onClick={applyFilters}>
+                                Применить
+                            </button>
                         </div>
                     </div>
-
-                    <div style={styles.modalFooter}>
-                        <button
-                            style={styles.resetBtn}
-                            onClick={resetTempFilters}>
-                            Сбросить все
-                        </button>
-                        <button
-                            style={styles.applyBtn}
-                            onClick={applyFilters}>
-                            Применить
-                        </button>
-                    </div>
-                </div>
+                </>
             )}
         </>
     );

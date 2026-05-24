@@ -1,6 +1,30 @@
 import React from 'react';
 
 const EventModalOrganizer = ({ event, onClose, onEdit, onDelete }) => {
+  // Форматирование даты (как в EventModal)
+  const formatDateTime = (dateTimeStr) => {
+    if (!dateTimeStr) return 'Дата не указана';
+    const date = new Date(dateTimeStr);
+    return date.toLocaleString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // Получение эмодзи для типа мероприятия (как в EventModal)
+  const getTypeEmoji = (type) => {
+    const types = {
+      hackathon: '🚀',
+      olympiad: '🏆',
+      conference: '🎤',
+      openday: '🚪'
+    };
+    return types[type] || '📌';
+  };
+
   const styles = {
     modalOverlay: {
       position: 'fixed',
@@ -99,7 +123,6 @@ const EventModalOrganizer = ({ event, onClose, onEdit, onDelete }) => {
     },
     detailIcon: {
       width: '20px',
-      color: '#2c7ab1',
       fontSize: '0.95rem',
     },
     lowSeats: {
@@ -175,7 +198,7 @@ const EventModalOrganizer = ({ event, onClose, onEdit, onDelete }) => {
               <div style={styles.detailItem}>
                 <span style={styles.detailIcon}>📅</span>
                 <span>
-                  <strong>Дата и время:</strong> {new Date(event.dateTime).toLocaleString('ru-RU')}
+                  <strong>Дата и время:</strong> {formatDateTime(event.dateTime)}
                 </span>
               </div>
 
@@ -214,7 +237,7 @@ const EventModalOrganizer = ({ event, onClose, onEdit, onDelete }) => {
               <div style={styles.detailItem}>
                 <span style={styles.detailIcon}>🏷️</span>
                 <span>
-                  <strong>Тип:</strong> {event.typeLabel}
+                  <strong>Тип:</strong> {getTypeEmoji(event.type)} {event.typeLabel}
                 </span>
               </div>
             </div>

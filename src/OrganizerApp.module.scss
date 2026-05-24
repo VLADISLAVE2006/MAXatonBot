@@ -1,10 +1,11 @@
 .app {
   min-height: 100vh;
-  background: linear-gradient(135deg, #d4e8ff 0%, #b8d4f0 100%);
+  background: var(--bg-primary);
   padding-top: 80px;
   padding-left: 20px;
   padding-right: 20px;
   padding-bottom: 80px;
+  transition: background 0.3s ease;
 }
 
 .container {
@@ -17,12 +18,13 @@
   top: 0;
   left: 0;
   right: 0;
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--bg-secondary);
   backdrop-filter: blur(10px);
   border-radius: 0 0 30px 30px;
   padding: 12px 20px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   z-index: 100;
+  transition: background 0.3s ease;
 }
 
 .panelWrapper {
@@ -38,11 +40,12 @@
   flex: 1;
   display: flex;
   align-items: center;
-  background: #f0f6fe;
+  background: var(--search-bg);
   border-radius: 40px;
   padding: 8px 16px;
   gap: 8px;
-  border: 1px solid #cce3ff;
+  border: 1px solid var(--search-border);
+  transition: background 0.3s ease, border 0.3s ease;
 
   i {
     color: #2c6e9e;
@@ -55,10 +58,10 @@
     border: none;
     outline: none;
     font-size: 14px;
-    color: #1a3d5c;
+    color: var(--search-text);
 
     &::placeholder {
-      color: #7a9bc2;
+      color: var(--search-placeholder);
     }
   }
 }
@@ -81,6 +84,7 @@
   font-size: 14px;
   color: white;
   white-space: nowrap;
+  transition: background 0.3s ease;
 
   &:hover {
     background: #236b91;
@@ -95,10 +99,11 @@
 .counter {
   font-size: 14px;
   font-weight: 600;
-  color: #1a4972;
+  color: var(--text-counter);
   margin-bottom: 16px;
   padding-left: 4px;
   margin-top: 8px;
+  transition: color 0.3s ease;
 }
 
 .eventsGrid {
@@ -113,12 +118,13 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--modal-overlay);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  transition: background 0.3s ease;
 }
 
 .modalWrapper {
