@@ -1,9 +1,10 @@
 import QRCode from "qrcode";
+import { stringify } from "csv-stringify/sync";
 import { api } from "@/api";
 import { type AppContext, getToken } from "@/context";
 import { env } from "@/env";
 import { buildEventDetailText, formatDate, formatSlots } from "@/utils/helpers";
-import { Keyboard } from "@maxhub/max-bot-api";
+import { FileAttachment, Keyboard } from "@maxhub/max-bot-api";
 import { backToHub, backToMyEvents, toHubNew } from "./menu";
 
 type Registration = {
@@ -129,7 +130,9 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
                       ...(isPast && !event.closed
                           ? [[Keyboard.button.callback("🔒 Закрыть мероприятие", `close_event:${event.id}`)]]
                           : []),
-                      ...(!event.closed ? [[Keyboard.button.callback("📲 QR-код посещаемости", `event_qr:${event.id}`)]] : []),
+                      ...(!event.closed
+                          ? [[Keyboard.button.callback("📲 QR-код посещаемости", `event_qr:${event.id}`)]]
+                          : []),
                       [backToMyEvents],
                   ];
         await ctx.editMessage({
@@ -255,6 +258,7 @@ export async function handleAttendeesCallback(ctx: AppContext): Promise<boolean>
 
         const rows = [
             ...(navRow.length ? [navRow] : []),
+            [Keyboard.button.callback("📥 Выгрузить CSV", `event_attendees_csv:${eventId}`)],
             [Keyboard.button.callback("📊 К статистике", `event_stats:${eventId}`)],
         ];
 
@@ -269,6 +273,45 @@ export async function handleAttendeesCallback(ctx: AppContext): Promise<boolean>
                 Keyboard.inlineKeyboard([[Keyboard.button.callback("📊 К статистике", `event_stats:${eventId}`)]]),
             ],
         });
+    }
+    return true;
+}
+
+export async function handleAttendeesExportCallback(ctx: AppContext): Promise<boolean> {
+    const payload = ctx.callback?.payload;
+    if (!payload?.startsWith("event_attendees_csv:")) return false;
+
+    const eventId = parseInt(payload.replace("event_attendees_csv:", ""), 10);
+    if (isNaN(eventId)) return false;
+
+    const token = getToken(ctx.user!.user_id) ?? "";
+    try {
+        const attendees = await api.events.getEventAttendees(eventId, token);
+        const csv = stringify(
+            [
+                ["Имя", "Зарегистрирован", "Посетил"],
+                ...attendees.map((a) => [
+                    a.full_name,
+                    new Date(a.registered_at * 1000).toLocaleString("ru-RU", { timeZone: "UTC" }),
+                    a.attended ? "Да" : "Нет",
+                ]),
+            ],
+            { bom: true },
+        );
+
+        await ctx.api.sendAction(ctx.chatId!, "sending_file");
+        const csvBuffer = Buffer.from(csv, "utf-8");
+        const { url: uploadUrl } = await ctx.api.raw.uploads.getUploadUrl({ type: "file" });
+        const formData = new FormData();
+        formData.append("data", new Blob([csvBuffer]), `attendees_${eventId}.csv`);
+        const uploadRes = await fetch(uploadUrl, { method: "POST", body: formData });
+        const uploadData = (await uploadRes.json()) as { token: string };
+        const file = new FileAttachment({ token: uploadData.token });
+        await new Promise((r) => setTimeout(r, 3000));
+        await ctx.reply("📥 Список участников:", { attachments: [file.toJson()] });
+    } catch (error) {
+        console.error(error);
+        await ctx.reply("Не удалось выгрузить список участников.");
     }
     return true;
 }

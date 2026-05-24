@@ -20,6 +20,7 @@
     },
     "dependencies": {
         "@maxhub/max-bot-api": "^0.2.2",
+        "csv-stringify": "^6.7.0",
         "dotenv": "^17.4.2",
         "node-cron": "^4.2.1",
         "ofetch": "^1.5.1",
