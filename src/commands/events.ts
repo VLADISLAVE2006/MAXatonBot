@@ -64,14 +64,12 @@ export async function handleHubEventsCallback(ctx: AppContext): Promise<boolean>
 
     try {
         const event = await api.events.getEventById(eventId, token);
+        const actionButton = event.is_registered
+            ? Keyboard.button.callback("❌ Отменить запись", `cancel:${event.id}`)
+            : Keyboard.button.callback("Записаться", `register:${event.id}`);
         await ctx.editMessage({
             text: buildEventDetailText(event),
-            attachments: [
-                Keyboard.inlineKeyboard([
-                    [Keyboard.button.callback("Записаться", `register:${event.id}`)],
-                    [backToEvents],
-                ]),
-            ],
+            attachments: [Keyboard.inlineKeyboard([[actionButton], [backToEvents]])],
         });
     } catch {
         await ctx.editMessage({

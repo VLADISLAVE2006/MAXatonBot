@@ -49,6 +49,33 @@ export const api = {
                 method: "GET",
             }),
     },
+    notifications: {
+        get: (token: string) =>
+            _fetch<{ enabled: boolean }>("/api/user/notifications", {
+                method: "GET",
+                token,
+            }),
+        update: (enabled: boolean, token: string) =>
+            _fetch("/api/user/notifications", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ enabled }),
+                token,
+            }),
+    },
+    reminders: {
+        getPending: () =>
+            _fetch<{ registration_id: number; user_id: number; event_id: number; event_title: string; event_date: number }[]>(
+                "/api/reminders/pending",
+                { method: "GET" },
+            ),
+        markSent: (registrationIds: number[]) =>
+            _fetch("/api/reminders/mark-sent", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ registration_ids: registrationIds }),
+            }),
+    },
     admin: {
         createOrganizer: (userId: number, fullName: string, token: string) =>
             _fetch("/api/admin/organizers", {
@@ -84,6 +111,7 @@ export const api = {
                 created_at: number;
                 updated_at: number;
                 registered_count: number;
+                is_registered: boolean;
             }>(`/api/events/${id}`, {
                 method: "GET",
                 token,
@@ -110,6 +138,31 @@ export const api = {
                 "/api/user/registrations",
                 { method: "GET", token },
             ),
+        updateEvent: (
+            id: number,
+            data: {
+                title: string;
+                description: string;
+                content: string;
+                max_slots: number | null;
+                cancellation_rules: string | null;
+                date: number;
+                format: string;
+                type: string;
+            },
+            token: string,
+        ) =>
+            _fetch(`/api/events/${id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+                token,
+            }),
+        deleteEvent: (id: number, token: string) =>
+            _fetch(`/api/events/${id}`, {
+                method: "DELETE",
+                token,
+            }),
         createEvent: (
             data: {
                 title: string;
