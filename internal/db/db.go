@@ -71,7 +71,8 @@ func InitDB() error {
 		type               VARCHAR NOT NULL,
 		created_by         BIGINT NOT NULL REFERENCES users(user_id),
 		created_at         TIMESTAMP NOT NULL DEFAULT now(),
-		updated_at         TIMESTAMP NOT NULL DEFAULT now()
+		updated_at         TIMESTAMP NOT NULL DEFAULT now(),
+		closed             BOOLEAN DEFAULT false
 	);`
 	_, err = DB.Exec(createEventsTableSQL)
 	if err != nil {
@@ -103,6 +104,23 @@ func InitDB() error {
 	if err != nil {
 		log.Printf("Warning: could not create index: %v", err)
 	}
+
+	//таблица отзывов
+	createReviewsTableSQL := `
+	CREATE TABLE IF NOT EXISTS reviews (
+		id SERIAL PRIMARY KEY,
+		event_id INT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+		user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+		rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+		comment TEXT,
+		created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+		UNIQUE(event_id, user_id)
+	);`
+	_, err = DB.Exec(createReviewsTableSQL)
+	if err != nil {
+		return fmt.Errorf("failed to create reviews table: %w", err)
+	}
+	log.Println("Table 'reviews' is ready")
 
 
 	if err := ensureAdmin(); err != nil {

@@ -78,6 +78,7 @@ func HandleGetEvents(w http.ResponseWriter, r *http.Request) {
             COUNT(r.id) AS registered_count
         FROM events e
         LEFT JOIN registrations r ON e.id = r.event_id
+		WHERE e.closed = false
         GROUP BY e.id, e.title, e.description, e.date, e.format, e.type, e.max_slots
         ORDER BY e.created_at DESC
     `)
@@ -187,6 +188,24 @@ func HandleRegisterEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Проверяем, что мероприятие ещё не началось и не закрыто
+	var eventDate time.Time
+	var closed bool
+	err = db.DB.QueryRow("SELECT date, closed FROM events WHERE id = $1", eventID).Scan(&eventDate, &closed)
+	if err != nil {
+		log.Printf("RegisterEvent date check error: %v", err)
+		writeError(w, http.StatusInternalServerError, "database error")
+		return
+	}
+	if closed {
+		writeError(w, http.StatusForbidden, "event is closed for registration")
+		return
+	}
+	if time.Now().After(eventDate) {
+		writeError(w, http.StatusForbidden, "event has already started or passed")
+		return
+	}
+
 	// Проверяем, не записан ли пользователь уже
 	var alreadyRegistered bool
 	err = db.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM registrations WHERE user_id = $1 AND event_id = $2)", userID, eventID).Scan(&alreadyRegistered)
@@ -215,11 +234,9 @@ func HandleRegisterEvent(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to register")
 		return
 	}
-
-	// Получаем название и дату мероприятия для ответа
+	// Получаем название мероприятия для ответа
 	var eventTitle string
-	var eventDate int64
-	db.DB.QueryRow("SELECT title, EXTRACT(epoch FROM date)::bigint FROM events WHERE id = $1", eventID).Scan(&eventTitle, &eventDate)
+	_ = db.DB.QueryRow("SELECT title FROM events WHERE id = $1", eventID).Scan(&eventTitle) // ошибку можно игнорировать
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -228,7 +245,7 @@ func HandleRegisterEvent(w http.ResponseWriter, r *http.Request) {
 		"code":          code,
 		"event_id":      eventID,
 		"event_title":   eventTitle,
-		"event_date":    eventDate,
+		"event_date":    eventDate.Unix(),    // <-- исправлено
 		"registered_at": registeredAt.Unix(),
 	})
 }
@@ -436,6 +453,82 @@ func HandleMarkAttendance(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(http.StatusOK)
     json.NewEncoder(w).Encode(map[string]string{"status": "attendance confirmed"})
 }
+
+
+type ReviewRequest struct {
+    Rating  int    `json:"rating"`
+    Comment string `json:"comment,omitempty"`
+}
+
+func HandleAddReview(w http.ResponseWriter, r *http.Request) {
+    claims := middleware.GetClaims(r)
+    userID := claims.UserID
+
+    id, err := strconv.Atoi(mux.Vars(r)["id"])
+    if err != nil {
+        writeError(w, http.StatusBadRequest, "invalid event id")
+        return
+    }
+
+    var req ReviewRequest
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        writeError(w, http.StatusBadRequest, "invalid JSON")
+        return
+    }
+    if req.Rating < 1 || req.Rating > 5 {
+        writeError(w, http.StatusBadRequest, "rating must be between 1 and 5")
+        return
+    }
+
+    // Проверяем, что мероприятие закрыто
+    var closed bool
+    err = db.DB.QueryRow("SELECT closed FROM events WHERE id = $1", id).Scan(&closed)
+    if err == sql.ErrNoRows {
+        writeError(w, http.StatusNotFound, "event not found")
+        return
+    }
+    if err != nil {
+        log.Printf("HandleAddReview check error: %v", err)
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
+    if !closed {
+        writeError(w, http.StatusForbidden, "can only review closed events")
+        return
+    }
+
+    // Проверяем, что пользователь был записан на мероприятие
+    var registered bool
+    err = db.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM registrations WHERE user_id = $1 AND event_id = $2)", userID, id).Scan(&registered)
+    if err != nil || !registered {
+        writeError(w, http.StatusForbidden, "only registered attendees can review")
+        return
+    }
+
+    // Проверяем, не оставлял ли уже отзыв
+    var alreadyReviewed bool
+    err = db.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM reviews WHERE user_id = $1 AND event_id = $2)", userID, id).Scan(&alreadyReviewed)
+    if err != nil {
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
+    if alreadyReviewed {
+        writeError(w, http.StatusConflict, "you have already reviewed this event")
+        return
+    }
+
+    // Вставляем отзыв
+    _, err = db.DB.Exec("INSERT INTO reviews (event_id, user_id, rating, comment) VALUES ($1, $2, $3, $4)", id, userID, req.Rating, req.Comment)
+    if err != nil {
+        log.Printf("HandleAddReview insert error: %v", err)
+        writeError(w, http.StatusInternalServerError, "failed to save review")
+        return
+    }
+
+    w.WriteHeader(http.StatusCreated)
+    json.NewEncoder(w).Encode(map[string]string{"status": "review submitted"})
+}
+
 
 
 // generateRegistrationCode создаёт случайный 8-значный код
@@ -718,11 +811,58 @@ func HandleDeleteEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 
+func HandleCloseEvent(w http.ResponseWriter, r *http.Request) {
+    claims := middleware.GetClaims(r)
+    userID := claims.UserID
+
+    id, err := strconv.Atoi(mux.Vars(r)["id"])
+    if err != nil {
+        writeError(w, http.StatusBadRequest, "invalid event id")
+        return
+    }
+
+    // Проверяем, что мероприятие существует и принадлежит пользователю
+    var createdBy int64
+    var closed bool
+    err = db.DB.QueryRow("SELECT created_by, closed FROM events WHERE id = $1", id).Scan(&createdBy, &closed)
+    if err == sql.ErrNoRows {
+        writeError(w, http.StatusNotFound, "event not found")
+        return
+    }
+    if err != nil {
+        log.Printf("HandleCloseEvent check error: %v", err)
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
+    if createdBy != userID {
+        writeError(w, http.StatusForbidden, "only the event creator can close the event")
+        return
+    }
+    if closed {
+        writeError(w, http.StatusConflict, "event already closed")
+        return
+    }
+
+    // Обновляем closed = true
+    _, err = db.DB.Exec("UPDATE events SET closed = true WHERE id = $1", id)
+    if err != nil {
+        log.Printf("HandleCloseEvent update error: %v", err)
+        writeError(w, http.StatusInternalServerError, "failed to close event")
+        return
+    }
+
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(map[string]string{"status": "event closed"})
+}
+
+
 //просмотр статистики
 type EventStats struct {
     TotalRegistered int `json:"total_registered"`
     TotalAttended   int `json:"total_attended"`
     Percentage      float64 `json:"percentage"`
+	ReviewsCount    int     `json:"reviews_count"`    // сколько отзывов
+    AverageRating   float64 `json:"average_rating"`   // средний рейтинг (0 если нет отзывов)
 }
 
 func HandleEventStats(w http.ResponseWriter, r *http.Request) {
@@ -752,17 +892,26 @@ func HandleEventStats(w http.ResponseWriter, r *http.Request) {
     }
 
     var stats EventStats
+    // Получаем статистику регистраций и отзывов
     err = db.DB.QueryRow(`
         SELECT 
-            COUNT(*) AS total_registered,
-            SUM(CASE WHEN attended THEN 1 ELSE 0 END) AS total_attended
-        FROM registrations
-        WHERE event_id = $1
-    `, id).Scan(&stats.TotalRegistered, &stats.TotalAttended)
+            COUNT(DISTINCT r.id) AS total_registered,
+            COALESCE(SUM(CASE WHEN r.attended THEN 1 ELSE 0 END), 0) AS total_attended,
+            COUNT(DISTINCT rev.id) AS reviews_count,
+            COALESCE(AVG(rev.rating), 0) AS average_rating
+        FROM events e
+        LEFT JOIN registrations r ON e.id = r.event_id
+        LEFT JOIN reviews rev ON e.id = rev.event_id
+        WHERE e.id = $1
+        GROUP BY e.id
+    `, id).Scan(&stats.TotalRegistered, &stats.TotalAttended, &stats.ReviewsCount, &stats.AverageRating)
     if err != nil {
+        log.Printf("HandleEventStats DB error: %v", err)
         writeError(w, http.StatusInternalServerError, "database error")
         return
     }
+
+    // Вычисляем процент посещаемости
     if stats.TotalRegistered > 0 {
         stats.Percentage = float64(stats.TotalAttended) / float64(stats.TotalRegistered) * 100
     } else {
@@ -771,4 +920,62 @@ func HandleEventStats(w http.ResponseWriter, r *http.Request) {
 
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(stats)
+}
+
+
+// возвращает список записавшихся пользователей (только для организатора)
+func HandleEventAttendees(w http.ResponseWriter, r *http.Request) {
+    claims := middleware.GetClaims(r)
+    userID := claims.UserID
+
+    id, err := strconv.Atoi(mux.Vars(r)["id"])
+    if err != nil {
+        writeError(w, http.StatusBadRequest, "invalid event id")
+        return
+    }
+
+    // Проверяем, что организатор – создатель
+    var createdBy int64
+    err = db.DB.QueryRow("SELECT created_by FROM events WHERE id = $1", id).Scan(&createdBy)
+    if err != nil {
+        writeError(w, http.StatusNotFound, "event not found")
+        return
+    }
+    if createdBy != userID {
+        writeError(w, http.StatusForbidden, "only the event creator can view attendees")
+        return
+    }
+
+    rows, err := db.DB.Query(`
+        SELECT u.user_id, u.full_name, r.registered_at, r.attended
+        FROM registrations r
+        JOIN users u ON r.user_id = u.user_id
+        WHERE r.event_id = $1
+    `, id)
+    if err != nil {
+        log.Printf("EventAttendees DB error: %v", err)
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
+    defer rows.Close()
+
+    type Attendee struct {
+        UserID       int64  `json:"user_id"`
+        FullName     string `json:"full_name"`
+        RegisteredAt int64  `json:"registered_at"`
+        Attended     bool   `json:"attended"`
+    }
+    attendees := []Attendee{}
+    for rows.Next() {
+        var a Attendee
+        var registeredAt time.Time
+        if err := rows.Scan(&a.UserID, &a.FullName, &registeredAt, &a.Attended); err != nil {
+            continue
+        }
+        a.RegisteredAt = registeredAt.Unix()
+        attendees = append(attendees, a)
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(attendees)
 }

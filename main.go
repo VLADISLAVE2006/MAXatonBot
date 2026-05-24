@@ -63,6 +63,8 @@ func main() {
 	router.HandleFunc("/api/reminders/mark-sent", middleware.APIAuth(handlers.HandleMarkRemindersSent)).Methods("POST")
 	//подтверждение записи
 	router.HandleFunc("/api/events/{id}/attendance", middleware.UserAuth(handlers.HandleMarkAttendance)).Methods("POST")
+	//добавление отзыва
+	router.HandleFunc("/api/events/{id}/review", middleware.UserAuth(handlers.HandleAddReview)).Methods("POST")
 
 	//для организатора
 	router.HandleFunc("/api/events", middleware.OrganizerAuth(handlers.HandleCreateEvent)).Methods("POST")
@@ -71,6 +73,10 @@ func main() {
 	router.HandleFunc("/api/events/{id}", middleware.OrganizerAuth(handlers.HandleDeleteEvent)).Methods("DELETE")
 	//просмтор статистики мероприятия
 	router.HandleFunc("/api/events/{id}/stats", middleware.OrganizerAuth(handlers.HandleEventStats)).Methods("GET")
+	//закрытие мероприятия
+	router.HandleFunc("/api/events/{id}/close", middleware.OrganizerAuth(handlers.HandleCloseEvent)).Methods("POST")
+	//просмтор людей, которые зарегались
+	router.HandleFunc("/api/events/{id}/attendees", middleware.OrganizerAuth(handlers.HandleEventAttendees)).Methods("GET")
 	
 
 	// Публичный эндпоинт для проверки работоспособности (без ключа)
