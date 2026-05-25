@@ -73,6 +73,7 @@ func InitDB() error {
 		created_at         TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
 		updated_at         TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
 		closed             BOOLEAN DEFAULT false
+		image_url          TEXT
 	);`
 	_, err = DB.Exec(createEventsTableSQL)
 	if err != nil {

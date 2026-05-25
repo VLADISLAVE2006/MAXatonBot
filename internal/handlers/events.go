@@ -10,6 +10,11 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+	"io"
+    "os"
+	"fmt"
+    "path/filepath"
+    "strings"
 	"github.com/lib/pq"
 	"github.com/gorilla/mux"
 )
@@ -40,6 +45,7 @@ type Event struct {
 	RegisteredCount   int     `json:"registered_count"`
 	IsRegistered      bool    `json:"is_registered"`
 	Closed            bool    `json:"closed"`
+	ImageURL          string `json:"image_url"`
 }
 
 type ShortEvent struct {
@@ -51,6 +57,7 @@ type ShortEvent struct {
 	Type            string `json:"type"`
 	MaxSlots        *int   `json:"max_slots"`
 	RegisteredCount int    `json:"registered_count"`
+	ImageURL        string `json:"image_url"`
 }
 
 type CreateEventRequest struct {
@@ -67,7 +74,7 @@ type CreateEventRequest struct {
 // Для абитуриента
 // HandleGetEvents возвращает список мероприятий в кратком виде
 func HandleGetEvents(w http.ResponseWriter, r *http.Request) {
-	rows, err := db.DB.Query(`
+    rows, err := db.DB.Query(`
         SELECT
             e.id,
             e.title,
@@ -76,33 +83,36 @@ func HandleGetEvents(w http.ResponseWriter, r *http.Request) {
             e.format,
             e.type,
             e.max_slots,
-            COUNT(r.id) AS registered_count
+            COUNT(r.id) AS registered_count,
+            e.image_url
         FROM events e
         LEFT JOIN registrations r ON e.id = r.event_id
-		WHERE e.closed = false
-        GROUP BY e.id, e.title, e.description, e.date, e.format, e.type, e.max_slots
+        WHERE e.closed = false
+        GROUP BY e.id, e.title, e.description, e.date, e.format, e.type, e.max_slots, e.image_url
         ORDER BY e.created_at DESC
     `)
-	if err != nil {
-		log.Printf("HandleGetEvents DB error: %v", err)
-		writeError(w, http.StatusInternalServerError, "database error")
-		return
-	}
-	defer rows.Close()
+    if err != nil {
+        log.Printf("HandleGetEvents DB error: %v", err)
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
+    defer rows.Close()
 
-	events := []ShortEvent{}
-	for rows.Next() {
-		var e ShortEvent
-		if err := rows.Scan(&e.ID, &e.Title, &e.Description, &e.Date, &e.Format, &e.Type, &e.MaxSlots, &e.RegisteredCount); err != nil {
-			log.Printf("HandleGetEvents scan error: %v", err)
-			continue
-		}
-		events = append(events, e)
-	}
+    events := []ShortEvent{}
+    for rows.Next() {
+        var e ShortEvent
+        if err := rows.Scan(&e.ID, &e.Title, &e.Description, &e.Date, &e.Format, &e.Type, &e.MaxSlots, &e.RegisteredCount, &e.ImageURL); err != nil {
+            log.Printf("HandleGetEvents scan error: %v", err)
+            continue
+        }
+        events = append(events, e)
+    }
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(events)
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(events)
 }
+
+
 
 // HandleGetEventByID возвращает полную информацию о мероприятии
 func HandleGetEventByID(w http.ResponseWriter, r *http.Request) {
@@ -126,12 +136,13 @@ func HandleGetEventByID(w http.ResponseWriter, r *http.Request) {
             EXTRACT(epoch FROM e.updated_at)::bigint AS updated_at,
             COUNT(r.id) AS registered_count,
             EXISTS(SELECT 1 FROM registrations WHERE user_id = $1 AND event_id = e.id) AS is_registered,
-            e.closed
+            e.closed,
+            e.image_url
         FROM events e
         LEFT JOIN registrations r ON e.id = r.event_id
         WHERE e.id = $2
         GROUP BY e.id, e.title, e.description, e.content, e.max_slots, e.cancellation_rules,
-                 e.date, e.format, e.type, e.created_by, e.created_at, e.updated_at, e.closed
+                 e.date, e.format, e.type, e.created_by, e.created_at, e.updated_at, e.closed, e.image_url
     `, userID, id).Scan(
         &e.ID, &e.Title, &e.Description, &e.Content,
         &e.MaxSlots, &e.CancellationRules,
@@ -141,6 +152,7 @@ func HandleGetEventByID(w http.ResponseWriter, r *http.Request) {
         &e.RegisteredCount,
         &e.IsRegistered,
         &e.Closed,
+        &e.ImageURL,
     )
     if err == sql.ErrNoRows {
         writeError(w, http.StatusNotFound, "event not found")
@@ -568,210 +580,254 @@ func generateRegistrationCode() string {
 // для организатора
 // HandleCreateEvent создаёт новое мероприятие (только для организатора)
 func HandleCreateEvent(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r)
+    claims := middleware.GetClaims(r)
+    userID := claims.UserID
 
-	// 1. Декодируем JSON
-	var req CreateEventRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
-		return
-	}
+    // Ограничение размера формы (10 MB)
+    if err := r.ParseMultipartForm(10 << 20); err != nil {
+        writeError(w, http.StatusBadRequest, "form too large")
+        return
+    }
 
-	// 2. Валидация полей
-	if req.Title == "" {
-		writeError(w, http.StatusBadRequest, "title is required")
-		return
-	}
-	if req.Description == "" {
-		writeError(w, http.StatusBadRequest, "description is required")
-		return
-	}
-	if req.Content == "" {
-		writeError(w, http.StatusBadRequest, "content is required")
-		return
-	}
-	if req.Format != "online" && req.Format != "offline" {
-		writeError(w, http.StatusBadRequest, "format must be 'online' or 'offline'")
-		return
-	}
-	if req.Type == "" {
-		writeError(w, http.StatusBadRequest, "type is required")
-		return
-	}
-	if req.Date == 0 {
-		writeError(w, http.StatusBadRequest, "date is required")
-		return
-	}
+    // Читаем поля формы
+    title := r.FormValue("title")
+    description := r.FormValue("description")
+    content := r.FormValue("content")
+    maxSlotsStr := r.FormValue("max_slots")
+    cancellationRules := r.FormValue("cancellation_rules")
+    dateStr := r.FormValue("date")
+    format := r.FormValue("format")
+    eventType := r.FormValue("type")
 
-	// 3. Вставка в БД (дата сохраняется как TIMESTAMP, поэтому преобразуем int64 -> timestamp)
-	var e Event
-	err := db.DB.QueryRow(`
-		INSERT INTO events
-			(title, description, content, max_slots, cancellation_rules, 
-			 date, format, type, created_by)
-		VALUES ($1, $2, $3, $4, $5, 
-		        to_timestamp($6), $7, $8, $9)
-		RETURNING 
-			id, title, description, content, max_slots, cancellation_rules,
-			EXTRACT(epoch FROM date)::bigint, format, type,
-			created_by,
-			EXTRACT(epoch FROM created_at)::bigint, EXTRACT(epoch FROM updated_at)::bigint
-	`,
-		req.Title, req.Description, req.Content,
-		req.MaxSlots, req.CancellationRules,
-		req.Date, req.Format, req.Type,
-		claims.UserID,
-	).Scan(
-		&e.ID, &e.Title, &e.Description, &e.Content,
-		&e.MaxSlots, &e.CancellationRules,
-		&e.Date, &e.Format, &e.Type,
-		&e.CreatedBy,
-		&e.CreatedAt, &e.UpdatedAt,
-	)
-	if err != nil {
-		log.Printf("HandleCreateEvent DB error: %v", err)
-		writeError(w, http.StatusInternalServerError, "failed to create event")
-		return
-	}
+    // Валидация обязательных полей
+    if title == "" || description == "" || content == "" || format == "" || eventType == "" || dateStr == "" {
+        writeError(w, http.StatusBadRequest, "missing required fields")
+        return
+    }
+    date, err := strconv.ParseInt(dateStr, 10, 64)
+    if err != nil || date == 0 {
+        writeError(w, http.StatusBadRequest, "invalid date (unix timestamp)")
+        return
+    }
+    var maxSlots *int
+    if maxSlotsStr != "" {
+        ms, err := strconv.Atoi(maxSlotsStr)
+        if err == nil && ms > 0 {
+            maxSlots = &ms
+        }
+    }
+    var cancellationRulesPtr *string
+    if cancellationRules != "" {
+        cancellationRulesPtr = &cancellationRules
+    }
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(e)
+    // Обработка картинки
+    var imageURL string
+    file, header, err := r.FormFile("image")
+    if err == nil {
+        defer file.Close()
+        // Проверяем, что это изображение (content-type)
+        contentType := header.Header.Get("Content-Type")
+        if strings.HasPrefix(contentType, "image/") {
+            url, err := saveUploadedFile(file, header.Filename, "events")
+            if err == nil {
+                imageURL = url
+            } else {
+                log.Printf("Error saving image: %v", err)
+            }
+        }
+    }
+
+    // Вставка в БД (добавлено поле image_url)
+    var e Event
+    query := `
+        INSERT INTO events
+            (title, description, content, max_slots, cancellation_rules, date, format, type, created_by, image_url)
+        VALUES ($1, $2, $3, $4, $5, to_timestamp($6), $7, $8, $9, $10)
+        RETURNING id, title, description, content, max_slots, cancellation_rules,
+                  EXTRACT(epoch FROM date)::bigint, format, type, created_by,
+                  EXTRACT(epoch FROM created_at)::bigint, EXTRACT(epoch FROM updated_at)::bigint,
+                  image_url
+    `
+    err = db.DB.QueryRow(query, title, description, content, maxSlots, cancellationRulesPtr,
+        date, format, eventType, userID, imageURL).Scan(
+        &e.ID, &e.Title, &e.Description, &e.Content,
+        &e.MaxSlots, &e.CancellationRules,
+        &e.Date, &e.Format, &e.Type,
+        &e.CreatedBy, &e.CreatedAt, &e.UpdatedAt,
+        &e.ImageURL,
+    )
+    if err != nil {
+        log.Printf("HandleCreateEvent DB error: %v", err)
+        // Если ошибка, удаляем загруженную картинку
+        if imageURL != "" {
+            deleteOldImage(imageURL)
+        }
+        writeError(w, http.StatusInternalServerError, "failed to create event")
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusCreated)
+    json.NewEncoder(w).Encode(e)
 }
+
 
 // HandleGetOrganizerEvents возвращает список мероприятий, созданных текущим организатором
 func HandleGetOrganizerEvents(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r)
-	userID := claims.UserID
+    claims := middleware.GetClaims(r)
+    userID := claims.UserID
 
-	rows, err := db.DB.Query(`
+    rows, err := db.DB.Query(`
         SELECT
             e.id, e.title, e.description, EXTRACT(epoch FROM e.date)::bigint AS date,
-            e.format, e.type, e.max_slots, COUNT(r.id) AS registered_count
+            e.format, e.type, e.max_slots, COUNT(r.id) AS registered_count,
+            e.image_url
         FROM events e
         LEFT JOIN registrations r ON e.id = r.event_id
         WHERE e.created_by = $1
-        GROUP BY e.id, e.title, e.description, e.date, e.format, e.type, e.max_slots
+        GROUP BY e.id, e.title, e.description, e.date, e.format, e.type, e.max_slots, e.image_url
         ORDER BY e.created_at DESC
     `, userID)
-	if err != nil {
-		log.Printf("HandleGetOrganizerEvents DB error: %v", err)
-		writeError(w, http.StatusInternalServerError, "database error")
-		return
-	}
-	defer rows.Close()
+    if err != nil {
+        log.Printf("HandleGetOrganizerEvents DB error: %v", err)
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
+    defer rows.Close()
 
-	events := []ShortEvent{}
-	for rows.Next() {
-		var e ShortEvent
-		if err := rows.Scan(&e.ID, &e.Title, &e.Description, &e.Date, &e.Format, &e.Type, &e.MaxSlots, &e.RegisteredCount); err != nil {
-			log.Printf("HandleGetOrganizerEvents scan error: %v", err)
-			continue
-		}
-		events = append(events, e)
-	}
+    events := []ShortEvent{}
+    for rows.Next() {
+        var e ShortEvent
+        if err := rows.Scan(&e.ID, &e.Title, &e.Description, &e.Date, &e.Format, &e.Type, &e.MaxSlots, &e.RegisteredCount, &e.ImageURL); err != nil {
+            log.Printf("HandleGetOrganizerEvents scan error: %v", err)
+            continue
+        }
+        events = append(events, e)
+    }
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(events)
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(events)
 }
 
 // HandleUpdateEvent обновляет существующее мероприятие (только для создателя)
 func HandleUpdateEvent(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r)
-	userID := claims.UserID
+    claims := middleware.GetClaims(r)
+    userID := claims.UserID
 
-	id, err := strconv.Atoi(mux.Vars(r)["id"])
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid event id")
-		return
-	}
+    id, err := strconv.Atoi(mux.Vars(r)["id"])
+    if err != nil {
+        writeError(w, http.StatusBadRequest, "invalid event id")
+        return
+    }
 
-	// Проверяем, что мероприятие существует и принадлежит пользователю
-	var createdBy int64
-	err = db.DB.QueryRow("SELECT created_by FROM events WHERE id = $1", id).Scan(&createdBy)
-	if err == sql.ErrNoRows {
-		writeError(w, http.StatusNotFound, "event not found")
-		return
-	}
-	if err != nil {
-		log.Printf("HandleUpdateEvent check error: %v", err)
-		writeError(w, http.StatusInternalServerError, "database error")
-		return
-	}
-	if createdBy != userID {
-		writeError(w, http.StatusForbidden, "you can only edit your own events")
-		return
-	}
+    // Проверяем, что мероприятие существует и принадлежит пользователю
+    var createdBy int64
+    var oldImageURL string
+    err = db.DB.QueryRow("SELECT created_by, image_url FROM events WHERE id = $1", id).Scan(&createdBy, &oldImageURL)
+    if err == sql.ErrNoRows {
+        writeError(w, http.StatusNotFound, "event not found")
+        return
+    }
+    if err != nil {
+        log.Printf("HandleUpdateEvent check error: %v", err)
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
+    if createdBy != userID {
+        writeError(w, http.StatusForbidden, "you can only edit your own events")
+        return
+    }
 
-	var req CreateEventRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
-		return
-	}
+    // Парсим форму
+    if err := r.ParseMultipartForm(10 << 20); err != nil {
+        writeError(w, http.StatusBadRequest, "form too large")
+        return
+    }
 
-	// Валидация (аналогично созданию)
-	if req.Title == "" {
-		writeError(w, http.StatusBadRequest, "title is required")
-		return
-	}
-	if req.Description == "" {
-		writeError(w, http.StatusBadRequest, "description is required")
-		return
-	}
-	if req.Content == "" {
-		writeError(w, http.StatusBadRequest, "content is required")
-		return
-	}
-	if req.Format != "online" && req.Format != "offline" {
-		writeError(w, http.StatusBadRequest, "format must be 'online' or 'offline'")
-		return
-	}
-	if req.Type == "" {
-		writeError(w, http.StatusBadRequest, "type is required")
-		return
-	}
-	if req.Date == 0 {
-		writeError(w, http.StatusBadRequest, "date is required")
-		return
-	}
+    title := r.FormValue("title")
+    description := r.FormValue("description")
+    content := r.FormValue("content")
+    maxSlotsStr := r.FormValue("max_slots")
+    cancellationRules := r.FormValue("cancellation_rules")
+    dateStr := r.FormValue("date")
+    format := r.FormValue("format")
+    eventType := r.FormValue("type")
 
-	// Обновляем мероприятие
-	var e Event
-	err = db.DB.QueryRow(`
-		UPDATE events SET
-			title = $1,
-			description = $2,
-			content = $3,
-			max_slots = $4,
-			cancellation_rules = $5,
-			date = to_timestamp($6),
-			format = $7,
-			type = $8,
-			updated_at = NOW()
-		WHERE id = $9 AND created_by = $10
-		RETURNING 
-			id, title, description, content, max_slots, cancellation_rules,
-			EXTRACT(epoch FROM date)::bigint, format, type, created_by,
-			EXTRACT(epoch FROM created_at)::bigint, EXTRACT(epoch FROM updated_at)::bigint
-	`,
-		req.Title, req.Description, req.Content,
-		req.MaxSlots, req.CancellationRules,
-		req.Date, req.Format, req.Type,
-		id, userID,
-	).Scan(
-		&e.ID, &e.Title, &e.Description, &e.Content,
-		&e.MaxSlots, &e.CancellationRules,
-		&e.Date, &e.Format, &e.Type,
-		&e.CreatedBy, &e.CreatedAt, &e.UpdatedAt,
-	)
-	if err != nil {
-		log.Printf("HandleUpdateEvent DB error: %v", err)
-		writeError(w, http.StatusInternalServerError, "failed to update event")
-		return
-	}
+    // Валидация (аналогично созданию)
+    if title == "" || description == "" || content == "" || format == "" || eventType == "" || dateStr == "" {
+        writeError(w, http.StatusBadRequest, "missing required fields")
+        return
+    }
+    date, err := strconv.ParseInt(dateStr, 10, 64)
+    if err != nil || date == 0 {
+        writeError(w, http.StatusBadRequest, "invalid date")
+        return
+    }
+    var maxSlots *int
+    if maxSlotsStr != "" {
+        ms, err := strconv.Atoi(maxSlotsStr)
+        if err == nil && ms > 0 {
+            maxSlots = &ms
+        }
+    }
+    var cancellationRulesPtr *string
+    if cancellationRules != "" {
+        cancellationRulesPtr = &cancellationRules
+    }
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(e)
+    // Обработка новой картинки
+    newImageURL := oldImageURL
+    file, header, err := r.FormFile("image")
+    if err == nil {
+        defer file.Close()
+        contentType := header.Header.Get("Content-Type")
+        if strings.HasPrefix(contentType, "image/") {
+            url, err := saveUploadedFile(file, header.Filename, "events")
+            if err == nil {
+                newImageURL = url
+                // Удаляем старую картинку, если она есть
+                if oldImageURL != "" {
+                    deleteOldImage(oldImageURL)
+                }
+            }
+        }
+    }
+
+    // Обновляем мероприятие
+    var e Event
+    query := `
+        UPDATE events SET
+            title = $1, description = $2, content = $3,
+            max_slots = $4, cancellation_rules = $5,
+            date = to_timestamp($6), format = $7, type = $8,
+            image_url = $9, updated_at = NOW()
+        WHERE id = $10 AND created_by = $11
+        RETURNING id, title, description, content, max_slots, cancellation_rules,
+                  EXTRACT(epoch FROM date)::bigint, format, type, created_by,
+                  EXTRACT(epoch FROM created_at)::bigint, EXTRACT(epoch FROM updated_at)::bigint,
+                  image_url
+    `
+    err = db.DB.QueryRow(query, title, description, content, maxSlots, cancellationRulesPtr,
+        date, format, eventType, newImageURL, id, userID).Scan(
+        &e.ID, &e.Title, &e.Description, &e.Content,
+        &e.MaxSlots, &e.CancellationRules,
+        &e.Date, &e.Format, &e.Type,
+        &e.CreatedBy, &e.CreatedAt, &e.UpdatedAt,
+        &e.ImageURL,
+    )
+    if err != nil {
+        log.Printf("HandleUpdateEvent DB error: %v", err)
+        // Если была загружена новая картинка, но БД не обновилась, удаляем её
+        if newImageURL != oldImageURL {
+            deleteOldImage(newImageURL)
+        }
+        writeError(w, http.StatusInternalServerError, "failed to update event")
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(e)
 }
 
 // HandleDeleteEvent удаляет мероприятие (только для создателя)
@@ -982,4 +1038,40 @@ func HandleEventAttendees(w http.ResponseWriter, r *http.Request) {
 
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(attendees)
+}
+
+
+// сохраняет файл из формы и возвращает относительный путь
+func saveUploadedFile(file io.Reader, filename string, folder string) (string, error) {
+    // Создаём директорию, если её нет
+    dir := filepath.Join("uploads", folder)
+    if err := os.MkdirAll(dir, 0755); err != nil {
+        return "", err
+    }
+    // Генерируем безопасное имя
+    ext := filepath.Ext(filename)
+    safeName := fmt.Sprintf("%d_%d%s", time.Now().UnixNano(), rand.Intn(10000), ext)
+    fullPath := filepath.Join(dir, safeName)
+    dst, err := os.Create(fullPath)
+    if err != nil {
+        return "", err
+    }
+    defer dst.Close()
+    if _, err := io.Copy(dst, file); err != nil {
+        return "", err
+    }
+    // Возвращаем относительный URL (для статической раздачи)
+    return "/" + strings.ReplaceAll(fullPath, "\\", "/"), nil
+}
+
+// удаляет файл по пути
+func deleteOldImage(imageURL string) {
+    if imageURL == "" {
+        return
+    }
+    // Из URL получаем локальный путь (например, из "/uploads/events/xxx.jpg" -> "uploads/events/xxx.jpg")
+    localPath := strings.TrimPrefix(imageURL, "/")
+    if err := os.Remove(localPath); err != nil && !os.IsNotExist(err) {
+        log.Printf("Failed to delete old image: %v", err)
+    }
 }

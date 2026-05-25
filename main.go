@@ -78,6 +78,9 @@ func main() {
 	//просмтор людей, которые зарегались
 	router.HandleFunc("/api/events/{id}/attendees", middleware.OrganizerAuth(handlers.HandleEventAttendees)).Methods("GET")
 	
+	//для картинок
+	// Раздача статических файлов из папки uploads
+	router.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
 
 	// Публичный эндпоинт для проверки работоспособности (без ключа)
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
