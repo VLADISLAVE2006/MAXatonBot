@@ -72,7 +72,7 @@ func InitDB() error {
 		created_by         BIGINT NOT NULL REFERENCES users(user_id),
 		created_at         TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
 		updated_at         TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-		closed             BOOLEAN DEFAULT false
+		closed             BOOLEAN DEFAULT false,
 		image_url          TEXT
 	);`
 	_, err = DB.Exec(createEventsTableSQL)
@@ -80,7 +80,6 @@ func InitDB() error {
 		return fmt.Errorf("failed to create events table: %w", err)
 	}
 	log.Println("Table 'events' is ready")
-
 
 	// Таблица регистраций
 	createRegistrationsTableSQL := `
@@ -122,7 +121,6 @@ func InitDB() error {
 		return fmt.Errorf("failed to create reviews table: %w", err)
 	}
 	log.Println("Table 'reviews' is ready")
-
 
 	if err := ensureAdmin(); err != nil {
 		log.Printf("Warning: could not ensure admin: %v", err)
