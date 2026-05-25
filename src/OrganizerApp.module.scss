@@ -47,11 +47,6 @@
   border: 1px solid var(--search-border);
   transition: background 0.3s ease, border 0.3s ease;
 
-  i {
-    color: #2c6e9e;
-    font-size: 14px;
-  }
-
   input {
     flex: 1;
     background: transparent;
@@ -63,12 +58,6 @@
     &::placeholder {
       color: var(--search-placeholder);
     }
-  }
-
-  // Добавляем эффект при фокусе
-  &:focus-within {
-    border-color: #2c7ab1;
-    box-shadow: 0 0 0 2px rgba(44, 122, 177, 0.2);
   }
 }
 

@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
+import { Icon } from "@iconify/react";
 
 const FilterPanel = ({ filters, setFilters }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -8,13 +9,7 @@ const FilterPanel = ({ filters, setFilters }) => {
     useEffect(() => {
         if (isOpen) {
             setTempFilters({ format: [...filters.format], type: [...filters.type] });
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = 'auto';
         }
-        return () => {
-            document.body.style.overflow = 'auto';
-        };
     }, [isOpen, filters.format, filters.type]);
 
     useEffect(() => {
@@ -34,15 +29,15 @@ const FilterPanel = ({ filters, setFilters }) => {
     }, [isOpen]);
 
     const formatOptions = [
-        { value: "online", label: "🖥 Онлайн" },
-        { value: "offline", label: "🏢 Оффлайн" },
+        { value: "online", label: "Онлайн", icon: "lucide:monitor" },
+        { value: "offline", label: "Оффлайн", icon: "lucide:building-2" },
     ];
 
     const typeOptions = [
-        { value: "hackathon", label: "🚀 Хакатон" },
-        { value: "olympiad", label: "🏆 Олимпиада" },
-        { value: "conference", label: "🎤 Конференция" },
-        { value: "openday", label: "🚪 День открытых дверей" },
+        { value: "hackathon", label: "Хакатон", icon: "lucide:rocket" },
+        { value: "olympiad", label: "Олимпиада", icon: "lucide:trophy" },
+        { value: "conference", label: "Конференция", icon: "lucide:mic" },
+        { value: "openday", label: "День открытых дверей", icon: "lucide:door-open" },
     ];
 
     const toggleTempFormat = (value) => {
@@ -95,24 +90,14 @@ const FilterPanel = ({ filters, setFilters }) => {
             fontSize: "11px",
             marginLeft: "5px",
         },
-        modalOverlay: {
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "var(--modal-overlay, rgba(0, 0, 0, 0.4))",
-            zIndex: 9998,
-        },
         modal: {
-            position: "fixed",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
+            position: "absolute",
+            top: "calc(100% + 8px)",
+            right: 0,
             background: "var(--bg-modal, white)",
             borderRadius: "20px",
-            width: "350px",
-            maxWidth: "90%",
+            width: "320px",
+            maxWidth: "90vw",
             zIndex: 9999,
             boxShadow: "var(--shadow-modal, 0 10px 40px rgba(0,0,0,0.2))",
         },
@@ -124,14 +109,16 @@ const FilterPanel = ({ filters, setFilters }) => {
             borderBottom: "1px solid var(--border-light, #eee)",
         },
         closeBtn: {
-            background: "var(--chip-bg, #f0f0f0)",
+            background: "var(--bg-chip, #f0f4fa)",
             border: "none",
             width: "30px",
             height: "30px",
             borderRadius: "50%",
             cursor: "pointer",
-            fontSize: "14px",
             color: "var(--text-primary, #333)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
         },
         modalBody: {
             padding: "20px",
@@ -161,6 +148,9 @@ const FilterPanel = ({ filters, setFilters }) => {
             fontSize: "13px",
             color: "var(--text-chip, #2c4d6e)",
             transition: "all 0.2s ease",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
             "&:hover": {
                 background: "var(--btn-filter-hover, #eef3fc)",
             },
@@ -203,25 +193,23 @@ const FilterPanel = ({ filters, setFilters }) => {
     };
 
     return (
-        <>
+        <div style={{ position: "relative", display: "inline-block" }}>
             <button
                 style={styles.filterBtn}
                 onClick={() => setIsOpen(true)}>
-                <i className="fas fa-sliders-h"></i>
+                <Icon icon="lucide:sliders-horizontal" width={16} height={16} />
                 <span>Фильтры</span>
                 {activeFiltersCount > 0 && <span style={styles.badge}>{activeFiltersCount}</span>}
             </button>
 
             {isOpen && (
-                <>
-                    <div style={styles.modalOverlay} onClick={() => setIsOpen(false)} />
                     <div style={styles.modal} ref={modalRef}>
                         <div style={styles.modalHeader}>
                             <h3 style={{ margin: 0, color: "var(--text-primary, #1a3d5c)" }}>Фильтры</h3>
                             <button
                                 style={styles.closeBtn}
                                 onClick={() => setIsOpen(false)}>
-                                ✕
+                                <Icon icon="lucide:x" width={16} height={16} />
                             </button>
                         </div>
 
@@ -237,6 +225,7 @@ const FilterPanel = ({ filters, setFilters }) => {
                                                 ...(tempFilters.format.includes(opt.value) ? styles.chipActive : {}),
                                             }}
                                             onClick={() => toggleTempFormat(opt.value)}>
+                                            <Icon icon={opt.icon} width={14} height={14} />
                                             {opt.label}
                                         </button>
                                     ))}
@@ -254,6 +243,7 @@ const FilterPanel = ({ filters, setFilters }) => {
                                                 ...(tempFilters.type.includes(opt.value) ? styles.chipActive : {}),
                                             }}
                                             onClick={() => toggleTempType(opt.value)}>
+                                            <Icon icon={opt.icon} width={14} height={14} />
                                             {opt.label}
                                         </button>
                                     ))}
@@ -274,9 +264,8 @@ const FilterPanel = ({ filters, setFilters }) => {
                             </button>
                         </div>
                     </div>
-                </>
             )}
-        </>
+        </div>
     );
 };
 

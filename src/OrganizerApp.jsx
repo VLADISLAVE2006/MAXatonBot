@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import { Icon } from "@iconify/react";
 import styles from "./OrganizerApp.module.scss";
 import EventCard from "./components/EventCard";
 import FilterPanel from "./components/FilterPanel";
@@ -28,17 +29,6 @@ function OrganizerApp() {
   useEffect(() => {
     loadEvents();
   }, []);
-
-  // Функция для получения эмодзи типа
-  const getTypeEmoji = (type) => {
-    const types = {
-      hackathon: '🚀',
-      olympiad: '🏆',
-      conference: '🎤',
-      openday: '🚪'
-    };
-    return types[type] || '📌';
-  };
 
   // Функция для получения названия типа
   const getTypeLabel = (type) => {
@@ -165,7 +155,7 @@ function OrganizerApp() {
       <div className={styles.topPanel}>
         <div className={styles.panelWrapper}>
           <div className={styles.searchWrapper}>
-            <i className="fas fa-search"></i>
+            <Icon icon="lucide:search" width={16} height={16} />
             <input
               type="text"
               placeholder="Поиск моих мероприятий..."
@@ -179,7 +169,7 @@ function OrganizerApp() {
               className={styles.createBtn}
               onClick={() => setIsCreateModalOpen(true)}
             >
-              <i className="fas fa-plus"></i>
+              <Icon icon="lucide:plus" width={16} height={16} />
               <span>Создать</span>
             </button>
           </div>

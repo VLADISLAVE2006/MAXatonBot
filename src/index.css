@@ -1,5 +1,7 @@
 /* Светлая тема (по умолчанию) */
 :root {
+  color-scheme: light;
+
   --bg-primary: linear-gradient(135deg, #d4e8ff 0%, #b8d4f0 100%);
   --bg-secondary: rgba(255, 255, 255, 0.95);
   --bg-card: #ffffff;
@@ -49,6 +51,8 @@
 /* Тёмная тема */
 @media (prefers-color-scheme: dark) {
   :root {
+    color-scheme: dark;
+
     --bg-primary: linear-gradient(135deg, #0f1722 0%, #0a0f16 100%);
     --bg-secondary: rgba(30, 40, 50, 0.95);
     --bg-card: #1a2332;

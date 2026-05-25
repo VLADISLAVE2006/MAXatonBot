@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { Icon } from "@iconify/react";
 
 const CreateEventModal = ({ event, onClose, onSave }) => {
   const isEditing = !!event;
@@ -77,10 +78,10 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
   }, [hasChanges]);
 
   const typeOptions = [
-    { value: 'hackathon', label: '🚀 Хакатон' },
-    { value: 'olympiad', label: '🏆 Олимпиада' },
-    { value: 'conference', label: '🎤 Конференция' },
-    { value: 'openday', label: '🚪 День открытых дверей' },
+    { value: 'hackathon', label: 'Хакатон' },
+    { value: 'olympiad', label: 'Олимпиада' },
+    { value: 'conference', label: 'Конференция' },
+    { value: 'openday', label: 'День открытых дверей' },
   ];
 
   const handleChange = (e) => {
@@ -308,7 +309,7 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
       <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div style={styles.header}>
           <h2 style={styles.title}>{isEditing ? 'Редактировать мероприятие' : 'Создать мероприятие'}</h2>
-          <button style={styles.closeBtn} onClick={handleClose}>✕</button>
+          <button style={styles.closeBtn} onClick={handleClose}><Icon icon="lucide:x" width={18} height={18} /></button>
         </div>
 
         <form onSubmit={handleSubmit} style={styles.body}>
@@ -419,8 +420,8 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
                 onChange={handleChange}
                 style={styles.select}
               >
-                <option value="offline">🏢 Оффлайн</option>
-                <option value="online">🖥 Онлайн</option>
+                <option value="offline">Оффлайн</option>
+                <option value="online">Онлайн</option>
               </select>
             </div>
 

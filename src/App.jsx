@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import { Icon } from "@iconify/react";
 import styles from "./App.module.scss";
 import EventCard from "./components/EventCard";
 import FilterPanel from "./components/FilterPanel";
@@ -61,7 +62,7 @@ function App() {
       <div className={styles.topPanel}>
         <div className={styles.panelWrapper}>
           <div className={styles.searchWrapper}>
-            <i className="fas fa-search"></i>
+            <Icon icon="lucide:search" width={16} height={16} />
             <input
               type="text"
               placeholder="Поиск мероприятий..."

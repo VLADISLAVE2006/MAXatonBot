@@ -1,6 +1,14 @@
 import React from "react";
+import { Icon } from "@iconify/react";
 
 const API_URL = import.meta.env.VITE_API_URL ?? '';
+
+const TYPE_ICONS = {
+  hackathon: "lucide:rocket",
+  olympiad: "lucide:trophy",
+  conference: "lucide:mic",
+  openday: "lucide:door-open",
+};
 
 const resolveImageUrl = (raw) => {
   if (!raw) return null;
@@ -28,15 +36,6 @@ const EventModal = ({ event, onClose }) => {
     });
   };
 
-  const getTypeEmoji = (type) => {
-    const types = {
-      hackathon: '🚀',
-      olympiad: '🏆',
-      conference: '🎤',
-      openday: '🚪'
-    };
-    return types[type] || '📌';
-  };
 
   const totalSeats = event.totalSeats || event.max_slots;
   const remainingSeats = event.remainingSeats !== undefined ? event.remainingSeats :
@@ -195,7 +194,7 @@ const EventModal = ({ event, onClose }) => {
     <div style={styles.modalOverlay} onClick={onClose}>
       <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
         <button style={styles.closeBtn} onClick={onClose}>
-          ✕
+          <Icon icon="lucide:x" width={18} height={18} />
         </button>
 
         <div style={styles.modalImage}>
@@ -210,21 +209,21 @@ const EventModal = ({ event, onClose }) => {
 
             <div style={styles.details}>
               <div style={styles.detailItem}>
-                <span style={styles.detailIcon}>📅</span>
+                <Icon icon="lucide:calendar" width={18} height={18} style={{ flexShrink: 0 }} />
                 <span>
                   <strong>Дата и время:</strong> {formatDateTime(event.dateTime)}
                 </span>
               </div>
 
               <div style={styles.detailItem}>
-                <span style={styles.detailIcon}>📍</span>
+                <Icon icon="lucide:map-pin" width={18} height={18} style={{ flexShrink: 0 }} />
                 <span>
                   <strong>Место проведения:</strong> {event.location}
                 </span>
               </div>
 
               <div style={styles.detailItem}>
-                <span style={styles.detailIcon}>👥</span>
+                <Icon icon="lucide:users" width={18} height={18} style={{ flexShrink: 0 }} />
                 <span>
                   <strong>Количество мест:</strong>{" "}
                   <span style={getSeatStyle()}>{getSeatText()}</span>
@@ -232,23 +231,25 @@ const EventModal = ({ event, onClose }) => {
               </div>
 
               <div style={styles.detailItem}>
-                <span style={styles.detailIcon}>🌐</span>
+                <Icon icon="lucide:globe" width={18} height={18} style={{ flexShrink: 0 }} />
                 <span>
                   <strong>Формат:</strong>{" "}
-                  {event.format === "online" ? "🖥 Онлайн" : "🏢 Оффлайн"}
+                  {event.format === "online"
+                    ? <><Icon icon="lucide:monitor" width={14} height={14} /> Онлайн</>
+                    : <><Icon icon="lucide:building-2" width={14} height={14} /> Оффлайн</>}
                 </span>
               </div>
 
               <div style={styles.detailItem}>
-                <span style={styles.detailIcon}>🏷️</span>
+                <Icon icon="lucide:tag" width={18} height={18} style={{ flexShrink: 0 }} />
                 <span>
-                  <strong>Тип:</strong> {getTypeEmoji(event.type)} {event.typeLabel}
+                  <strong>Тип:</strong> <Icon icon={TYPE_ICONS[event.type] || "lucide:pin"} width={14} height={14} /> {event.typeLabel}
                 </span>
               </div>
             </div>
 
             <button style={styles.registerBtn} onClick={handleRegister}>
-              ✏️ Записаться на мероприятие
+              <Icon icon="lucide:pencil" width={16} height={16} /> Записаться на мероприятие
             </button>
           </div>
         </div>
