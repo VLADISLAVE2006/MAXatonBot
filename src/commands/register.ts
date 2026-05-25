@@ -1,5 +1,7 @@
 import { api } from "@/api";
 import { type AppContext, getToken } from "@/context";
+import { toHubNew } from "@/commands/menu";
+import { Keyboard } from "@maxhub/max-bot-api";
 import { formatDate } from "@/utils/helpers";
 
 export async function handleAttendDeeplink(ctx: AppContext): Promise<boolean> {
@@ -42,7 +44,9 @@ export async function handleRegisterDeeplink(ctx: AppContext): Promise<boolean> 
 
     try {
         const result = await api.events.registerEvent(eventId, token);
-        await ctx.reply(`✅ Вы успешно записались на мероприятие!\n\n🎫 Код записи: ${result.code}`);
+        await ctx.reply(`✅ Вы успешно записались на мероприятие!\n\n🎫 Код записи: ${result.code}`, {
+            attachments: [Keyboard.inlineKeyboard([[toHubNew]])],
+        });
     } catch {
         await ctx.reply("Не удалось записаться. Возможно, вы уже записаны или нет свободных мест.");
     }
