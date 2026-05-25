@@ -5,6 +5,35 @@ const EventModal = ({ event, onClose }) => {
     window.location.href = `https://max.ru/${import.meta.env.VITE_BOT_USERNAME}?start=register_${event.id}`;
   };
 
+  const formatDateTime = (dateTimeStr) => {
+    if (!dateTimeStr) return 'Дата не указана';
+    const date = new Date(dateTimeStr);
+    if (isNaN(date.getTime())) {
+      return 'Дата не указана';
+    }
+    return date.toLocaleString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getTypeEmoji = (type) => {
+    const types = {
+      hackathon: '🚀',
+      olympiad: '🏆',
+      conference: '🎤',
+      openday: '🚪'
+    };
+    return types[type] || '📌';
+  };
+
+  const totalSeats = event.totalSeats || event.max_slots;
+  const remainingSeats = event.remainingSeats !== undefined ? event.remainingSeats : 
+                         (event.max_slots && event.registered_count !== undefined ? event.max_slots - event.registered_count : null);
+
   const styles = {
     modalOverlay: {
       position: "fixed",
@@ -12,7 +41,7 @@ const EventModal = ({ event, onClose }) => {
       left: 0,
       right: 0,
       bottom: 0,
-      background: "rgba(0, 0, 0, 0.5)",
+      background: "var(--modal-overlay, rgba(0, 0, 0, 0.5))",
       backdropFilter: "blur(4px)",
       display: "flex",
       alignItems: "center",
@@ -20,7 +49,7 @@ const EventModal = ({ event, onClose }) => {
       zIndex: 1000,
     },
     modal: {
-      background: "white",
+      background: "var(--bg-modal, white)",
       borderRadius: "28px",
       overflow: "hidden",
       position: "relative",
@@ -29,7 +58,7 @@ const EventModal = ({ event, onClose }) => {
       flexDirection: "column",
       width: "90%",
       maxWidth: "500px",
-      boxShadow: "0 20px 40px rgba(0, 0, 0, 0.3)",
+      boxShadow: "var(--shadow-modal, 0 20px 40px rgba(0, 0, 0, 0.3))",
     },
     closeBtn: {
       position: "absolute",
@@ -74,6 +103,7 @@ const EventModal = ({ event, onClose }) => {
       flex: 1,
       overflowY: "auto",
       padding: "16px 20px 20px 20px",
+      background: "var(--bg-modal, white)",
     },
     scrollArea: {
       display: "flex",
@@ -83,11 +113,11 @@ const EventModal = ({ event, onClose }) => {
     description: {
       fontSize: "0.9rem",
       lineHeight: "1.5",
-      color: "#2c3e4e",
+      color: "var(--text-secondary, #2c3e4e)",
       margin: 0,
     },
     details: {
-      background: "#f8fafd",
+      background: "var(--bg-details, #f8fafd)",
       borderRadius: "20px",
       padding: "14px 16px",
       display: "flex",
@@ -99,11 +129,10 @@ const EventModal = ({ event, onClose }) => {
       alignItems: "center",
       gap: "12px",
       fontSize: "0.85rem",
-      color: "#1f3b4c",
+      color: "var(--text-secondary, #1f3b4c)",
     },
     detailIcon: {
       width: "20px",
-      color: "#2c7ab1",
       fontSize: "0.95rem",
     },
     lowSeats: {
@@ -114,8 +143,12 @@ const EventModal = ({ event, onClose }) => {
       color: "#27ae60",
       fontWeight: 600,
     },
+    noSeats: {
+      color: "#e74c3c",
+      fontWeight: 700,
+    },
     registerBtn: {
-      background: "linear-gradient(135deg, #2c7ab1, #1e5a7e)",
+      background: "var(--btn-primary, linear-gradient(135deg, #2c7ab1, #1e5a7e))",
       border: "none",
       color: "white",
       padding: "12px 20px",
@@ -130,6 +163,20 @@ const EventModal = ({ event, onClose }) => {
       transition: "all 0.2s",
       marginTop: "4px",
     },
+  };
+
+  const getSeatStyle = () => {
+    if (remainingSeats === null) return styles.normalSeats;
+    if (remainingSeats <= 0) return styles.noSeats;
+    if (remainingSeats <= 5) return styles.lowSeats;
+    return styles.normalSeats;
+  };
+
+
+  const getSeatText = () => {
+    if (remainingSeats === null) return "∞ (безлимит)";
+    if (remainingSeats <= 0) return "Мест нет";
+    return `Свободно: ${remainingSeats} из ${totalSeats}`;
   };
 
   return (
@@ -158,7 +205,7 @@ const EventModal = ({ event, onClose }) => {
               <div style={styles.detailItem}>
                 <span style={styles.detailIcon}>📅</span>
                 <span>
-                  <strong>Дата и время:</strong> {event.dateTime}
+                  <strong>Дата и время:</strong> {formatDateTime(event.dateTime)}
                 </span>
               </div>
 
@@ -172,21 +219,8 @@ const EventModal = ({ event, onClose }) => {
               <div style={styles.detailItem}>
                 <span style={styles.detailIcon}>👥</span>
                 <span>
-                  {event.totalSeats != null ? (
-                    <span
-                      style={
-                        event.remainingSeats <= 0
-                          ? styles.lowSeats
-                          : event.remainingSeats <= 5
-                          ? styles.lowSeats
-                          : styles.normalSeats
-                      }
-                    >
-                      {event.remainingSeats <= 0 ? 'Мест нет' : `Свободно: ${event.remainingSeats} из ${event.totalSeats}`}
-                    </span>
-                  ) : (
-                    <span style={styles.normalSeats}>∞</span>
-                  )}
+                  <strong>Количество мест:</strong>{" "}
+                  <span style={getSeatStyle()}>{getSeatText()}</span>
                 </span>
               </div>
 
@@ -201,7 +235,7 @@ const EventModal = ({ event, onClose }) => {
               <div style={styles.detailItem}>
                 <span style={styles.detailIcon}>🏷️</span>
                 <span>
-                  <strong>Тип:</strong> {event.typeLabel}
+                  <strong>Тип:</strong> {getTypeEmoji(event.type)} {event.typeLabel}
                 </span>
               </div>
             </div>
