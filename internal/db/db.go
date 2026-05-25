@@ -66,12 +66,12 @@ func InitDB() error {
 		content            TEXT NOT NULL,
 		max_slots          INT,
 		cancellation_rules TEXT,
-		date               TIMESTAMP NOT NULL,
+		date               TIMESTAMP WITH TIME ZONE NOT NULL,
 		format             VARCHAR NOT NULL,
 		type               VARCHAR NOT NULL,
 		created_by         BIGINT NOT NULL REFERENCES users(user_id),
-		created_at         TIMESTAMP NOT NULL DEFAULT now(),
-		updated_at         TIMESTAMP NOT NULL DEFAULT now(),
+		created_at         TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+		updated_at         TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
 		closed             BOOLEAN DEFAULT false
 	);`
 	_, err = DB.Exec(createEventsTableSQL)
