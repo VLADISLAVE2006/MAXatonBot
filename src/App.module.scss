@@ -64,6 +64,12 @@
       color: var(--search-placeholder);
     }
   }
+
+  // Добавляем эффект при фокусе
+  &:focus-within {
+    border-color: #2c7ab1;
+    box-shadow: 0 0 0 2px rgba(44, 122, 177, 0.2);
+  }
 }
 
 .counter {

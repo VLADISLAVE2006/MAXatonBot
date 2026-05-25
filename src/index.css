@@ -1,54 +1,99 @@
+/* Светлая тема (по умолчанию) */
 :root {
   --bg-primary: linear-gradient(135deg, #d4e8ff 0%, #b8d4f0 100%);
   --bg-secondary: rgba(255, 255, 255, 0.95);
-  --bg-card: white;
-  --bg-modal: white;
+  --bg-card: #ffffff;
+  --bg-modal: #ffffff;
   --bg-details: #f8fafd;
+  --bg-chip: #f0f4fa;
+  --bg-button: #ffffff;
+  --bg-input: #f0f6fe;
+  
   --text-primary: #1a3d5c;
   --text-secondary: #2c3e4e;
   --text-counter: #1a4972;
-  --search-bg: #f0f6fe;
-  --search-border: #cce3ff;
-  --search-text: #1a3d5c;
-  --search-placeholder: #7a9bc2;
-  --modal-overlay: rgba(0, 0, 0, 0.5);
-  --chip-bg: #f0f4fa;
-  --chip-border: #d4e2f0;
-  --chip-text: #2c4d6e;
-  --chip-active: #2c7ab1;
-  --border-light: #eee;
+  --text-chip: #2c4d6e;
+  --text-placeholder: #7a9bc2;
+  --text-button: #1e4663;
+  --text-input: #1a3d5c;
+  
+  --border-light: #eef2f6;
+  --border-input: #cce3ff;
+  --border-chip: #d4e2f0;
+  
+  --btn-primary: linear-gradient(135deg, #2c7ab1, #1e5a7e);
+  --btn-primary-hover: linear-gradient(135deg, #358bc2, #236b91);
+  --btn-primary-text: #ffffff;
+  --btn-danger: linear-gradient(135deg, #e74c3c, #c0392b);
+  --btn-secondary: #f0f4fa;
+  --btn-secondary-text: #4a6f8f;
+  --btn-filter: #ffffff;
+  --btn-filter-text: #1e4663;
+  --btn-filter-border: #cce3ff;
+  --btn-filter-hover: #eef3fc;
+  --btn-create: #2c7ab1;
+  --btn-create-text: #ffffff;
+  --btn-create-hover: #236b91;
+  --btn-close-bg: #f0f4fa;
+  --btn-close-color: #2c6e9e;
+  --btn-close-hover: #e2ecf7;
+  
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-card-hover: 0 8px 20px rgba(0, 0, 0, 0.12);
+  --shadow-modal: 0 20px 40px rgba(0, 0, 0, 0.3);
+  
   --scrollbar-track: #e2ecf7;
   --scrollbar-thumb: #2c7ab1;
-  --shadow-modal: 0 20px 40px rgba(0, 0, 0, 0.3);
-  --btn-primary: linear-gradient(135deg, #2c7ab1, #1e5a7e);
-  --btn-danger: linear-gradient(135deg, #e74c3c, #c0392b);
 }
 
+/* Тёмная тема */
 @media (prefers-color-scheme: dark) {
   :root {
     --bg-primary: linear-gradient(135deg, #0f1722 0%, #0a0f16 100%);
     --bg-secondary: rgba(30, 40, 50, 0.95);
     --bg-card: #1a2332;
     --bg-modal: #1a2332;
+    --search-border: #4a6a8a;
     --bg-details: #0f1722;
+    --bg-chip: #2a3a4a;
+    --bg-button: #1e2a3a;
+    --bg-input: #1a2332;
+    
     --text-primary: #e8edf2;
     --text-secondary: #b0c4de;
     --text-counter: #90caf9;
-    --search-bg: #2a3a4a;
-    --search-border: #3a4a5a;
-    --search-text: #e0e0e0;
-    --search-placeholder: #8a9aaa;
-    --modal-overlay: rgba(0, 0, 0, 0.8);
-    --chip-bg: #2a3a4a;
-    --chip-border: #3a4a5a;
-    --chip-text: #c0c0c0;
-    --chip-active: #1e5a7e;
+    --text-chip: #c0d0e0;
+    --text-placeholder: #8a9aaa;
+    --text-button: #90caf9;
+    --text-input: #e8edf2;
+    
     --border-light: #2a3a4a;
+    --border-input: #4a6a8a;
+    --border-chip: #3a4a5a;
+    
+    --btn-primary: linear-gradient(135deg, #1e5a7e, #0d3b52);
+    --btn-primary-hover: linear-gradient(135deg, #2c6e9e, #1a4a6e);
+    --btn-primary-text: #e8edf2;
+    --btn-danger: linear-gradient(135deg, #8e2a1e, #6b1f16);
+    --btn-secondary: #2a3a4a;
+    --btn-secondary-text: #b0c4de;
+    --btn-filter: #1e2a3a;
+    --btn-filter-text: #90caf9;
+    --btn-filter-border: #4a6a8a;
+    --btn-filter-hover: #2a3a4a;
+    --btn-create: #1e5a7e;
+    --btn-create-text: #e8edf2;
+    --btn-create-hover: #2c6e9e;
+    --btn-close-bg: #2a3a4a;
+    --btn-close-color: #b0c4de;
+    --btn-close-hover: #3a4a5a;
+    
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-card-hover: 0 8px 20px rgba(0, 0, 0, 0.4);
+    --shadow-modal: 0 20px 40px rgba(0, 0, 0, 0.5);
+    
     --scrollbar-track: #1a2332;
     --scrollbar-thumb: #1e5a7e;
-    --shadow-modal: 0 20px 40px rgba(0, 0, 0, 0.5);
-    --btn-primary: linear-gradient(135deg, #1e5a7e, #0d3b52);
-    --btn-danger: linear-gradient(135deg, #8e2a1e, #6b1f16);
   }
 }
 
@@ -66,6 +111,24 @@ body {
   transition: background 0.3s ease, color 0.3s ease;
 }
 
+/* Стили для полей ввода */
+input, textarea, select {
+  background-color: var(--bg-input);
+  color: var(--text-input);
+  border-color: var(--border-input);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--text-placeholder);
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: #2c7ab1;
+  box-shadow: 0 0 0 2px rgba(44, 122, 177, 0.2);
+}
+
+/* Стили для скролла */
 ::-webkit-scrollbar {
   width: 8px;
 }

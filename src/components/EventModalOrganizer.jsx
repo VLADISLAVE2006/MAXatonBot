@@ -27,8 +27,8 @@ const EventModalOrganizer = ({ event, onClose, onEdit, onDelete }) => {
   };
 
   const totalSeats = event.totalSeats || event.max_slots;
-  const remainingSeats = event.remainingSeats !== undefined ? event.remainingSeats : 
-                         (event.max_slots && event.registered_count !== undefined ? event.max_slots - event.registered_count : null);
+  const remainingSeats = event.remainingSeats !== undefined ? event.remainingSeats :
+    (event.max_slots && event.registered_count !== undefined ? event.max_slots - event.registered_count : null);
 
   const styles = {
     modalOverlay: {
@@ -57,22 +57,23 @@ const EventModalOrganizer = ({ event, onClose, onEdit, onDelete }) => {
       boxShadow: 'var(--shadow-modal, 0 20px 40px rgba(0, 0, 0, 0.3))',
     },
     closeBtn: {
-      position: 'absolute',
-      top: '12px',
-      right: '12px',
-      background: 'rgba(0, 0, 0, 0.6)',
-      border: 'none',
-      color: 'white',
-      width: '36px',
-      height: '36px',
-      borderRadius: '50%',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      cursor: 'pointer',
+      position: "absolute",
+      top: "12px",
+      right: "12px",
+      background: "var(--btn-close-bg, rgba(0, 0, 0, 0.6))",
+      border: "none",
+      color: "var(--btn-close-color, white)",
+      width: "36px",
+      height: "36px",
+      borderRadius: "50%",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: "pointer",
       zIndex: 10,
-      fontSize: '18px',
-      fontWeight: 'bold',
+      fontSize: "18px",
+      fontWeight: "bold",
+      transition: "all 0.2s ease",
     },
     modalImage: {
       height: '200px',

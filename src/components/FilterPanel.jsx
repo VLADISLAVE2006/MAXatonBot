@@ -72,7 +72,7 @@ const FilterPanel = ({ filters, setFilters }) => {
 
     const styles = {
         filterBtn: {
-            background: "white",
+            background: "var(--btn-filter, white)",
             border: "none",
             padding: "8px 20px",
             borderRadius: "40px",
@@ -82,9 +82,10 @@ const FilterPanel = ({ filters, setFilters }) => {
             gap: "8px",
             cursor: "pointer",
             fontSize: "14px",
-            color: "#1e4663",
-            border: "1px solid #cce3ff",
+            color: "var(--btn-filter-text, #1e4663)",
+            border: "1px solid var(--btn-filter-border, #cce3ff)",
             whiteSpace: "nowrap",
+            transition: "all 0.2s ease",
         },
         badge: {
             background: "#2c7ab1",
@@ -100,7 +101,7 @@ const FilterPanel = ({ filters, setFilters }) => {
             left: 0,
             right: 0,
             bottom: 0,
-            background: "rgba(0, 0, 0, 0.4)",
+            background: "var(--modal-overlay, rgba(0, 0, 0, 0.4))",
             zIndex: 9998,
         },
         modal: {
@@ -108,12 +109,12 @@ const FilterPanel = ({ filters, setFilters }) => {
             top: "50%",
             left: "50%",
             transform: "translate(-50%, -50%)",
-            background: "white",
+            background: "var(--bg-modal, white)",
             borderRadius: "20px",
             width: "350px",
             maxWidth: "90%",
             zIndex: 9999,
-            boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
+            boxShadow: "var(--shadow-modal, 0 10px 40px rgba(0,0,0,0.2))",
         },
         modalHeader: {
             display: "flex",
@@ -123,13 +124,14 @@ const FilterPanel = ({ filters, setFilters }) => {
             borderBottom: "1px solid var(--border-light, #eee)",
         },
         closeBtn: {
-            background: "#f0f0f0",
+            background: "var(--chip-bg, #f0f0f0)",
             border: "none",
             width: "30px",
             height: "30px",
             borderRadius: "50%",
             cursor: "pointer",
             fontSize: "14px",
+            color: "var(--text-primary, #333)",
         },
         modalBody: {
             padding: "20px",
@@ -143,7 +145,7 @@ const FilterPanel = ({ filters, setFilters }) => {
             fontWeight: "600",
             marginBottom: "10px",
             fontSize: "14px",
-            color: "#2c6e9e",
+            color: "var(--chip-active, #2c6e9e)",
         },
         chips: {
             display: "flex",
@@ -151,18 +153,22 @@ const FilterPanel = ({ filters, setFilters }) => {
             gap: "8px",
         },
         chip: {
-            background: "#f0f4fa",
-            border: "1px solid #d4e2f0",
+            background: "var(--bg-chip, #f0f4fa)",
+            border: "1px solid var(--border-chip, #d4e2f0)",
             padding: "6px 14px",
             borderRadius: "40px",
             cursor: "pointer",
             fontSize: "13px",
-            color: "#2c4d6e",
+            color: "var(--text-chip, #2c4d6e)",
+            transition: "all 0.2s ease",
+            "&:hover": {
+                background: "var(--btn-filter-hover, #eef3fc)",
+            },
         },
         chipActive: {
-            background: "#2c7ab1",
+            background: "var(--chip-active, #2c7ab1)",
             color: "white",
-            border: "1px solid #2c7ab1",
+            border: "1px solid var(--chip-active, #2c7ab1)",
         },
         modalFooter: {
             display: "flex",
@@ -177,8 +183,10 @@ const FilterPanel = ({ filters, setFilters }) => {
             cursor: "pointer",
             border: "none",
             fontSize: "14px",
-            background: "#f0f4fa",
-            color: "#4a6f8f",
+            fontWeight: "500",
+            background: "var(--btn-secondary, #f0f4fa)",
+            color: "var(--btn-secondary-text, #4a6f8f)",
+            transition: "all 0.2s ease",
         },
         applyBtn: {
             flex: 1,
@@ -187,8 +195,10 @@ const FilterPanel = ({ filters, setFilters }) => {
             cursor: "pointer",
             border: "none",
             fontSize: "14px",
-            background: "#2c7ab1",
-            color: "white",
+            fontWeight: "600",
+            background: "var(--btn-primary, #2c7ab1)",
+            color: "var(--btn-primary-text, white)",
+            transition: "all 0.2s ease",
         },
     };
 
@@ -207,7 +217,7 @@ const FilterPanel = ({ filters, setFilters }) => {
                     <div style={styles.modalOverlay} onClick={() => setIsOpen(false)} />
                     <div style={styles.modal} ref={modalRef}>
                         <div style={styles.modalHeader}>
-                            <h3 style={{ margin: 0 }}>Фильтры</h3>
+                            <h3 style={{ margin: 0, color: "var(--text-primary, #1a3d5c)" }}>Фильтры</h3>
                             <button
                                 style={styles.closeBtn}
                                 onClick={() => setIsOpen(false)}>

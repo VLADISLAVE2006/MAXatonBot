@@ -64,6 +64,12 @@
       color: var(--search-placeholder);
     }
   }
+
+  // Добавляем эффект при фокусе
+  &:focus-within {
+    border-color: #2c7ab1;
+    box-shadow: 0 0 0 2px rgba(44, 122, 177, 0.2);
+  }
 }
 
 .buttonGroup {
@@ -72,7 +78,7 @@
 }
 
 .createBtn {
-  background: #2c7ab1;
+  background: var(--btn-create, #2c7ab1);
   border: none;
   padding: 8px 20px;
   border-radius: 40px;
@@ -82,12 +88,12 @@
   gap: 8px;
   cursor: pointer;
   font-size: 14px;
-  color: white;
+  color: var(--btn-create-text, white);
   white-space: nowrap;
-  transition: background 0.3s ease;
+  transition: all 0.2s ease;
 
   &:hover {
-    background: #236b91;
+    background: var(--btn-create-hover, #236b91);
     transform: translateY(-1px);
   }
 

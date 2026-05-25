@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 
 const CreateEventModal = ({ event, onClose, onSave }) => {
   const isEditing = !!event;
-  
+
   const [formData, setFormData] = useState({
     title: event?.title || '',
     description: event?.description || '',
@@ -13,7 +13,7 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
     format: event?.format || 'offline',
     type: event?.type || 'hackathon',
   });
-  
+
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(event?.imageUrl || '');
   const [hasChanges, setHasChanges] = useState(false);
@@ -30,7 +30,7 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
         format: event?.format || 'offline',
         type: event?.type || 'hackathon',
       };
-      
+
       const currentData = {
         title: formData.title,
         description: formData.description,
@@ -40,15 +40,15 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
         format: formData.format,
         type: formData.type,
       };
-      
+
       const isDataChanged = JSON.stringify(originalData) !== JSON.stringify(currentData);
-      const isImageChanged = (imageFile !== null) || 
-        (imagePreview && !event?.imageUrl) || 
+      const isImageChanged = (imageFile !== null) ||
+        (imagePreview && !event?.imageUrl) ||
         (event?.imageUrl && imagePreview !== event?.imageUrl && imageFile);
-      
+
       return isDataChanged || isImageChanged;
     };
-    
+
     setHasChanges(hasUnsavedChanges());
   }, [formData, imageFile, imagePreview, event]);
 
@@ -71,7 +71,7 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
         return e.returnValue;
       }
     };
-    
+
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasChanges]);
@@ -95,14 +95,14 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
         alert('Изображение слишком большое. Максимальный размер 500KB');
         return;
       }
-      
+
       if (!file.type.match('image.*')) {
         alert('Пожалуйста, выберите изображение');
         return;
       }
-      
+
       setImageFile(file);
-      
+
       const reader = new FileReader();
       reader.onload = (e) => {
         setImagePreview(e.target.result);
@@ -117,7 +117,7 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
         resolve(imagePreview || null);
         return;
       }
-      
+
       const reader = new FileReader();
       reader.onload = (e) => {
         resolve(e.target.result);
@@ -128,7 +128,7 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.title.trim()) {
       alert('Введите название мероприятия');
       return;
@@ -149,15 +149,15 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
       alert('Введите корректное количество мест');
       return;
     }
-    
+
     const imageBase64 = await convertToBase64();
-    
+
     const saveData = {
       ...formData,
       totalSeats: parseInt(formData.totalSeats, 10),
       id: event?.id,
     };
-    
+
     onSave(saveData, imageBase64);
   };
 
@@ -173,7 +173,7 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
       left: 0,
       right: 0,
       bottom: 0,
-      background: 'rgba(0, 0, 0, 0.5)',
+      background: 'var(--modal-overlay, rgba(0, 0, 0, 0.5))',
       backdropFilter: 'blur(4px)',
       display: 'flex',
       alignItems: 'center',
@@ -181,40 +181,41 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
       zIndex: 1000,
     },
     modal: {
-      background: 'white',
+      background: 'var(--bg-modal, white)',
       borderRadius: '28px',
       width: '90%',
       maxWidth: '550px',
       maxHeight: '90vh',
       display: 'flex',
       flexDirection: 'column',
-      boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
+      boxShadow: 'var(--shadow-modal, 0 20px 40px rgba(0, 0, 0, 0.3))',
     },
     header: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
       padding: '18px 24px',
-      borderBottom: '1px solid #eef2f6',
+      borderBottom: '1px solid var(--border-light, #eef2f6)',
     },
     title: {
       fontSize: '1.3rem',
       fontWeight: 700,
-      color: '#1a3d5c',
+      color: 'var(--text-primary, #1a3d5c)',
       margin: 0,
     },
     closeBtn: {
-      background: '#f0f4fa',
-      border: 'none',
-      width: '34px',
-      height: '34px',
-      borderRadius: '50%',
-      cursor: 'pointer',
-      fontSize: '16px',
-      color: '#2c6e9e',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
+      background: "var(--btn-close-bg, #f0f4fa)",
+      border: "none",
+      width: "34px",
+      height: "34px",
+      borderRadius: "50%",
+      cursor: "pointer",
+      fontSize: "16px",
+      color: "var(--btn-close-color, #2c6e9e)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      transition: "all 0.2s ease",
     },
     body: {
       flex: 1,
@@ -227,24 +228,26 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
     label: {
       display: 'block',
       fontWeight: 600,
-      color: '#2c6e9e',
+      color: 'var(--chip-active, #2c6e9e)',
       marginBottom: '8px',
       fontSize: '14px',
     },
     input: {
       width: '100%',
       padding: '10px 14px',
-      border: '1px solid #d4e2f0',
+      border: '1px solid var(--border-input, #d4e2f0)',
       borderRadius: '12px',
       fontSize: '14px',
       outline: 'none',
       transition: 'border-color 0.2s',
       boxSizing: 'border-box',
+      background: 'var(--bg-input, white)',
+      color: 'var(--text-primary, #1a3d5c)',
     },
     textarea: {
       width: '100%',
       padding: '10px 14px',
-      border: '1px solid #d4e2f0',
+      border: '1px solid var(--border-input, #d4e2f0)',
       borderRadius: '12px',
       fontSize: '14px',
       outline: 'none',
@@ -252,19 +255,22 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
       minHeight: '80px',
       fontFamily: 'inherit',
       boxSizing: 'border-box',
+      background: 'var(--bg-input, white)',
+      color: 'var(--text-primary, #1a3d5c)',
     },
     select: {
       width: '100%',
       padding: '10px 14px',
-      border: '1px solid #d4e2f0',
+      border: '1px solid var(--border-input, #d4e2f0)',
       borderRadius: '12px',
       fontSize: '14px',
       outline: 'none',
-      backgroundColor: 'white',
+      backgroundColor: 'var(--bg-input, white)',
+      color: 'var(--text-primary, #1a3d5c)',
       cursor: 'pointer',
     },
     imageArea: {
-      border: '2px dashed #d4e2f0',
+      border: '2px dashed var(--border-input, #d4e2f0)',
       borderRadius: '16px',
       padding: '16px',
       textAlign: 'center',
@@ -281,17 +287,17 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
       display: 'flex',
       gap: '12px',
       padding: '16px 24px 24px',
-      borderTop: '1px solid #eef2f6',
+      borderTop: '1px solid var(--border-light, #eef2f6)',
     },
     cancelBtn: {
       flex: 1,
-      background: '#f0f4fa',
+      background: 'var(--btn-secondary, #f0f4fa)',
       border: 'none',
       padding: '12px',
       borderRadius: '40px',
       cursor: 'pointer',
       fontWeight: 500,
-      color: '#4a6f8f',
+      color: 'var(--btn-secondary-text, #4a6f8f)',
       fontSize: '14px',
     },
     saveBtn: {
@@ -329,7 +335,7 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
               {imagePreview ? (
                 <img src={imagePreview} alt="Preview" style={styles.imagePreview} />
               ) : (
-                <div style={{ color: '#7a9bc2' }}>
+                <div style={{ color: 'var(--text-placeholder, #7a9bc2)' }}>
                   <i className="fas fa-cloud-upload-alt" style={{ fontSize: '32px', marginBottom: '8px', display: 'block' }}></i>
                   <span>Нажмите для выбора изображения</span>
                   <br />

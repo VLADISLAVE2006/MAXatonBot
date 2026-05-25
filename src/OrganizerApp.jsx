@@ -29,39 +29,57 @@ function OrganizerApp() {
     loadEvents();
   }, []);
 
+  // Функция для получения эмодзи типа
+  const getTypeEmoji = (type) => {
+    const types = {
+      hackathon: '🚀',
+      olympiad: '🏆',
+      conference: '🎤',
+      openday: '🚪'
+    };
+    return types[type] || '📌';
+  };
+
+  // Функция для получения названия типа
+  const getTypeLabel = (type) => {
+    const labels = {
+      hackathon: 'Хакатон',
+      olympiad: 'Олимпиада',
+      conference: 'Конференция',
+      openday: 'День открытых дверей'
+    };
+    return labels[type] || type;
+  };
+
   const handleCardClick = async (event) => {
     try {
       const full = await api.events.getById(event.id);
       setSelectedEvent({
-        ...full,
+        id: full.id,
+        title: full.title,
+        description: full.description,
+        imageUrl: full.image_url || event.imageUrl,
         location: full.content,
+        format: full.format,
+        type: full.type,
+        typeLabel: getTypeLabel(full.type),
         totalSeats: full.max_slots,
-        remainingSeats:
-          full.max_slots != null
-            ? full.max_slots - full.registered_count
-            : null,
-        dateTime: new Date(full.date * 1000).toLocaleDateString("ru-RU", {
-          day: "numeric",
-          month: "long",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+        remainingSeats: full.max_slots != null ? full.max_slots - full.registered_count : null,
+        // СОХРАНЯЕМ ИСХОДНУЮ ДАТУ В ISO ФОРМАТЕ
+        dateTime: new Date(full.date * 1000).toISOString(),
       });
     } catch (err) {
       console.error("Failed to load event:", err);
     }
   };
 
-  const handleCreateEvent = async (formData) => {
+  const handleCreateEvent = async (formData, imageBase64) => {
     try {
       await api.events.create({
         title: formData.title,
         description: formData.description,
         content: formData.location,
-        max_slots: formData.totalSeats
-          ? parseInt(formData.totalSeats, 10)
-          : null,
+        max_slots: formData.totalSeats ? parseInt(formData.totalSeats, 10) : null,
         cancellation_rules: formData.cancellationRules?.trim() || null,
         date: Math.floor(new Date(formData.dateTime).getTime() / 1000),
         format: formData.format,
@@ -75,15 +93,13 @@ function OrganizerApp() {
     }
   };
 
-  const handleEditEvent = async (formData) => {
+  const handleEditEvent = async (formData, imageBase64) => {
     try {
       await api.events.update(formData.id, {
         title: formData.title,
         description: formData.description,
         content: formData.location,
-        max_slots: formData.totalSeats
-          ? parseInt(formData.totalSeats, 10)
-          : null,
+        max_slots: formData.totalSeats ? parseInt(formData.totalSeats, 10) : null,
         cancellation_rules: formData.cancellationRules?.trim() || null,
         date: Math.floor(new Date(formData.dateTime).getTime() / 1000),
         format: formData.format,
@@ -113,14 +129,17 @@ function OrganizerApp() {
 
   const openEditModal = async (event) => {
     try {
-      // Fetch full event to populate all form fields
       const full = await api.events.getById(event.id);
       setEditingEvent({
-        ...full,
+        id: full.id,
+        title: full.title,
+        description: full.description,
         location: full.content,
         totalSeats: full.max_slots,
         cancellationRules: full.cancellation_rules ?? "",
         dateTime: new Date(full.date * 1000).toISOString().slice(0, 16),
+        format: full.format,
+        type: full.type,
       });
       setSelectedEvent(null);
     } catch (err) {

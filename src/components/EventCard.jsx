@@ -2,12 +2,19 @@ import React from 'react';
 import styles from './EventCard.module.scss';
 
 const EventCard = ({ event, onClick }) => {
+  // Форматирование даты для отображения на карточке
   const formatDate = (dateTimeStr) => {
     if (!dateTimeStr) return 'Дата не указана';
+    
+    // Пробуем распарсить дату
     const date = new Date(dateTimeStr);
+    
+    // Проверяем, корректная ли дата
     if (isNaN(date.getTime())) {
+      console.warn('Invalid date:', dateTimeStr);
       return 'Дата не указана';
     }
+    
     return date.toLocaleDateString('ru-RU', {
       day: 'numeric',
       month: 'long',
@@ -16,21 +23,15 @@ const EventCard = ({ event, onClick }) => {
     });
   };
 
-  const getTypeEmoji = (type) => {
-    const types = {
-      hackathon: '🚀',
-      olympiad: '🏆',
-      conference: '🎤',
-      openday: '🚪'
-    };
-    return types[type] || '📌';
-  };
-
+  // Поддержка обоих форматов (max_slots/registered_count и totalSeats/remainingSeats)
   const totalSeats = event.totalSeats || event.max_slots;
   const remainingSeats = event.remainingSeats !== undefined ? event.remainingSeats : 
                          (event.max_slots && event.registered_count !== undefined ? event.max_slots - event.registered_count : null);
   
   const freeSlots = remainingSeats;
+
+  // Получаем отформатированную дату
+  const formattedDate = formatDate(event.dateTime);
 
   return (
     <div className={styles.card} onClick={onClick}>
@@ -40,17 +41,14 @@ const EventCard = ({ event, onClick }) => {
       >
         {freeSlots != null && (
           <div className={`${styles.slotsBadge} ${freeSlots === 0 ? styles.full : freeSlots <= 5 ? styles.low : ''}`}>
-            {freeSlots === 0 ? 'Мест нет' : `Свободно: ${freeSlots} из ${totalSeats}`}
+            {freeSlots === 0 ? 'Мест нет' : `Свободно: ${freeSlots}`}
           </div>
         )}
         <div className={styles.overlay}>
           <h3 className={styles.title}>{event.title}</h3>
           <div className={styles.eventInfo}>
             <span className={styles.date}>
-              📅 {formatDate(event.dateTime)}
-            </span>
-            <span className={styles.type}>
-              {getTypeEmoji(event.type)} {event.typeLabel}
+              {formattedDate}
             </span>
           </div>
         </div>
