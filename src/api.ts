@@ -87,12 +87,12 @@ export const api = {
     },
     events: {
         getEvents: (token: string) =>
-            _fetch<{ id: number; title: string; description: string; date: number; max_slots: number | null; registered_count: number }[]>("/api/events", {
+            _fetch<{ id: number; title: string; description: string; date: number; format: string; type: string; max_slots: number | null; registered_count: number; image_url: string }[]>("/api/events", {
                 method: "GET",
                 token,
             }),
         getOrganizerEvents: (token: string) =>
-            _fetch<{ id: number; title: string; description: string; date: number; max_slots: number | null; registered_count: number }[]>("/api/organizer/events", {
+            _fetch<{ id: number; title: string; description: string; date: number; format: string; type: string; max_slots: number | null; registered_count: number; image_url: string }[]>("/api/organizer/events", {
                 method: "GET",
                 token,
             }),
@@ -113,6 +113,7 @@ export const api = {
                 registered_count: number;
                 is_registered: boolean;
                 closed: boolean;
+                image_url: string;
             }>(`/api/events/${id}`, {
                 method: "GET",
                 token,
@@ -135,30 +136,10 @@ export const api = {
                 token,
             }),
         getMyRegistrations: (token: string) =>
-            _fetch<{ id: number; event_id: number; event_title: string; event_date: number; code: string; registered_at: number }[]>(
+            _fetch<{ id: number; event_id: number; event_title: string; event_date: number; code: string; registered_at: number; attended: boolean }[]>(
                 "/api/user/registrations",
                 { method: "GET", token },
             ),
-        updateEvent: (
-            id: number,
-            data: {
-                title: string;
-                description: string;
-                content: string;
-                max_slots: number | null;
-                cancellation_rules: string | null;
-                date: number;
-                format: string;
-                type: string;
-            },
-            token: string,
-        ) =>
-            _fetch(`/api/events/${id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(data),
-                token,
-            }),
         deleteEvent: (id: number, token: string) =>
             _fetch(`/api/events/${id}`, {
                 method: "DELETE",
@@ -191,25 +172,6 @@ export const api = {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ rating, ...(comment ? { comment } : {}) }),
-                token,
-            }),
-        createEvent: (
-            data: {
-                title: string;
-                description: string;
-                content: string;
-                max_slots: number | null;
-                cancellation_rules: string | null;
-                date: number;
-                format: string;
-                type: string;
-            },
-            token: string,
-        ) =>
-            _fetch("/api/events", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(data),
                 token,
             }),
     },
