@@ -1,5 +1,13 @@
 import React from "react";
 
+const API_URL = import.meta.env.VITE_API_URL ?? '';
+
+const resolveImageUrl = (raw) => {
+  if (!raw) return null;
+  if (raw.startsWith('http')) return raw;
+  return `${API_URL}${raw}`;
+};
+
 const EventModal = ({ event, onClose }) => {
   const handleRegister = () => {
     window.location.href = `https://max.ru/${import.meta.env.VITE_BOT_USERNAME}?start=register_${event.id}`;
@@ -33,6 +41,8 @@ const EventModal = ({ event, onClose }) => {
   const totalSeats = event.totalSeats || event.max_slots;
   const remainingSeats = event.remainingSeats !== undefined ? event.remainingSeats :
     (event.max_slots && event.registered_count !== undefined ? event.max_slots - event.registered_count : null);
+
+  const imageUrl = resolveImageUrl(event.image_url || event.imageUrl);
 
   const styles = {
     modalOverlay: {
@@ -83,6 +93,7 @@ const EventModal = ({ event, onClose }) => {
       height: "200px",
       backgroundSize: "cover",
       backgroundPosition: "center",
+      backgroundImage: imageUrl ? `url(${imageUrl})` : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       position: "relative",
     },
     imageOverlay: {
@@ -187,12 +198,7 @@ const EventModal = ({ event, onClose }) => {
           ✕
         </button>
 
-        <div
-          style={{
-            ...styles.modalImage,
-            backgroundImage: `url(${event.imageUrl})`,
-          }}
-        >
+        <div style={styles.modalImage}>
           <div style={styles.imageOverlay}>
             <h2 style={styles.modalTitle}>{event.title}</h2>
           </div>

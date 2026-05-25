@@ -21,6 +21,12 @@
   height: 160px;
   background-size: cover;
   background-position: center;
+  background-color: var(--bg-secondary, #e8eaed);
+
+  &.noImage {
+    background-image: none;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
 }
 
 .overlay {

@@ -111,22 +111,7 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
     }
   };
 
-  const convertToBase64 = () => {
-    return new Promise((resolve) => {
-      if (!imageFile) {
-        resolve(imagePreview || null);
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        resolve(e.target.result);
-      };
-      reader.readAsDataURL(imageFile);
-    });
-  };
-
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
 
     if (!formData.title.trim()) {
@@ -150,15 +135,13 @@ const CreateEventModal = ({ event, onClose, onSave }) => {
       return;
     }
 
-    const imageBase64 = await convertToBase64();
-
     const saveData = {
       ...formData,
       totalSeats: parseInt(formData.totalSeats, 10),
       id: event?.id,
     };
 
-    onSave(saveData, imageBase64);
+    onSave(saveData, imageFile);
   };
 
   const formatDateForInput = (dateTimeStr) => {

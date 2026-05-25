@@ -73,7 +73,7 @@ function OrganizerApp() {
     }
   };
 
-  const handleCreateEvent = async (formData, imageBase64) => {
+  const handleCreateEvent = async (formData, imageFile) => {
     try {
       await api.events.create({
         title: formData.title,
@@ -84,6 +84,7 @@ function OrganizerApp() {
         date: Math.floor(new Date(formData.dateTime).getTime() / 1000),
         format: formData.format,
         type: formData.type,
+        image: imageFile ?? undefined,
       });
       setIsCreateModalOpen(false);
       loadEvents();
@@ -93,7 +94,7 @@ function OrganizerApp() {
     }
   };
 
-  const handleEditEvent = async (formData, imageBase64) => {
+  const handleEditEvent = async (formData, imageFile) => {
     try {
       await api.events.update(formData.id, {
         title: formData.title,
@@ -104,6 +105,7 @@ function OrganizerApp() {
         date: Math.floor(new Date(formData.dateTime).getTime() / 1000),
         format: formData.format,
         type: formData.type,
+        image: imageFile ?? undefined,
       });
       setEditingEvent(null);
       setSelectedEvent(null);
