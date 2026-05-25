@@ -5,7 +5,12 @@ import { Keyboard } from "@maxhub/max-bot-api";
 const HUB_TEXT = "Главное меню. Выберите раздел:";
 
 export const hubKeyboard = (role?: Role | null) => {
-    const isOrganizer = role === "organizer" || role === "admin";
+    if (role === "admin") {
+        return Keyboard.inlineKeyboard([
+            [Keyboard.button.callback("👤 Создать организатора", "admin:create_organizer")],
+        ]);
+    }
+    const isOrganizer = role === "organizer";
     const rows = [
         [
             Keyboard.button.callback("📅 Мероприятия", "menu:events"),

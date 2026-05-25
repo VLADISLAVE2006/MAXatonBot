@@ -5,6 +5,7 @@ import { getSession, getToken, type AppContext } from "@/context";
 import { handleRegistrationCallback, handleRegistrationMessage, startRegistration } from "./registration";
 import { handleAttendDeeplink, handleRegisterDeeplink } from "@/commands/register";
 import { handleReviewCallback, handleReviewMessage } from "./review";
+import { handleAdminCallback, handleAdminMessage } from "./admin";
 
 type FlowRouter = {
     onBotStarted?: (ctx: AppContext) => void | Promise<void>;
@@ -21,6 +22,10 @@ const flows: FlowRouter[] = [
     {
         onMessageCreated: handleReviewMessage,
         onMessageCallback: handleReviewCallback,
+    },
+    {
+        onMessageCreated: handleAdminMessage,
+        onMessageCallback: handleAdminCallback,
     },
 ];
 
