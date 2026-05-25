@@ -3,7 +3,7 @@ import "dotenv/config";
 import { env } from "@/env";
 import { initFlows } from "@/flows";
 import { api } from "@/api";
-import { AppContext, getSession, setSession, setRole, setToken, setFullName, setStep } from "@/context";
+import { AppContext, getSession, setSession, setRole, setToken, setFullName, setStep, setFlow } from "@/context";
 import { initCommands } from "@/commands";
 import { initReminders } from "@/reminders";
 
@@ -11,7 +11,7 @@ const bot = new Bot<AppContext>(env.BOT_TOKEN!, { contextType: AppContext });
 
 bot.use(async (ctx, next) => {
     console.log(`Received update of type ${ctx.updateType} from user ${ctx.user?.user_id}`);
-    if (ctx.updateType !== "message_created") return await next();
+    if (!["message_created", "message_callback", "bot_started"].includes(ctx.updateType)) return await next();
     if (!ctx.user) return await next();
 
     const session = getSession(ctx.user.user_id);
@@ -24,6 +24,7 @@ bot.use(async (ctx, next) => {
             setFullName(ctx.user.user_id, userInfo.full_name);
 
             if (!userInfo.full_name) {
+                setFlow(ctx.user.user_id, "registration");
                 setStep(ctx.user.user_id, "registration/name");
             }
         } catch (error) {
