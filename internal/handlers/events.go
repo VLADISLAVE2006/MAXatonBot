@@ -609,6 +609,13 @@ func HandleCreateEvent(w http.ResponseWriter, r *http.Request) {
         writeError(w, http.StatusBadRequest, "invalid date (unix timestamp)")
         return
     }
+
+    // Проверка даты 
+    if date <= time.Now().Unix() {
+        writeError(w, http.StatusBadRequest, "event date must be in the future")
+        return
+    }
+
     var maxSlots *int
     if maxSlotsStr != "" {
         ms, err := strconv.Atoi(maxSlotsStr)
@@ -721,10 +728,11 @@ func HandleUpdateEvent(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Проверяем, что мероприятие существует и принадлежит пользователю
+    // Проверяем, что мероприятие существует, принадлежит пользователю и не закрыто
     var createdBy int64
     var oldImageURL string
-    err = db.DB.QueryRow("SELECT created_by, image_url FROM events WHERE id = $1", id).Scan(&createdBy, &oldImageURL)
+    var closed bool
+    err = db.DB.QueryRow("SELECT created_by, image_url, closed FROM events WHERE id = $1", id).Scan(&createdBy, &oldImageURL, &closed)
     if err == sql.ErrNoRows {
         writeError(w, http.StatusNotFound, "event not found")
         return
@@ -736,6 +744,10 @@ func HandleUpdateEvent(w http.ResponseWriter, r *http.Request) {
     }
     if createdBy != userID {
         writeError(w, http.StatusForbidden, "you can only edit your own events")
+        return
+    }
+    if closed {
+        writeError(w, http.StatusForbidden, "cannot edit a closed event")
         return
     }
 
@@ -754,7 +766,6 @@ func HandleUpdateEvent(w http.ResponseWriter, r *http.Request) {
     format := r.FormValue("format")
     eventType := r.FormValue("type")
 
-    // Валидация (аналогично созданию)
     if title == "" || description == "" || content == "" || format == "" || eventType == "" || dateStr == "" {
         writeError(w, http.StatusBadRequest, "missing required fields")
         return
@@ -764,6 +775,13 @@ func HandleUpdateEvent(w http.ResponseWriter, r *http.Request) {
         writeError(w, http.StatusBadRequest, "invalid date")
         return
     }
+
+    // === НОВАЯ ПРОВЕРКА: новая дата должна быть в будущем ===
+    if date <= time.Now().Unix() {
+        writeError(w, http.StatusBadRequest, "event date must be in the future")
+        return
+    }
+
     var maxSlots *int
     if maxSlotsStr != "" {
         ms, err := strconv.Atoi(maxSlotsStr)
@@ -786,7 +804,6 @@ func HandleUpdateEvent(w http.ResponseWriter, r *http.Request) {
             url, err := saveUploadedFile(file, header.Filename, "events")
             if err == nil {
                 newImageURL = url
-                // Удаляем старую картинку, если она есть
                 if oldImageURL != "" {
                     deleteOldImage(oldImageURL)
                 }
@@ -818,7 +835,6 @@ func HandleUpdateEvent(w http.ResponseWriter, r *http.Request) {
     )
     if err != nil {
         log.Printf("HandleUpdateEvent DB error: %v", err)
-        // Если была загружена новая картинка, но БД не обновилась, удаляем её
         if newImageURL != oldImageURL {
             deleteOldImage(newImageURL)
         }
