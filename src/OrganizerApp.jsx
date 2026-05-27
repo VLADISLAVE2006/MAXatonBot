@@ -30,7 +30,35 @@ function OrganizerApp() {
     loadEvents();
   }, []);
 
-  // Функция для получения названия типа
+  const getEventDate = (event) => {
+    if (event.date) {
+      return event.date;
+    }
+    if (event.dateTime) {
+      const date = new Date(event.dateTime);
+      if (!isNaN(date.getTime())) {
+        return Math.floor(date.getTime() / 1000);
+      }
+    }
+    if (event.timestamp) {
+      return event.timestamp;
+    }
+    return Infinity;
+  };
+
+  const sortByNearestDate = (eventsList) => {
+    return [...eventsList].sort((a, b) => {
+      const dateA = getEventDate(a);
+      const dateB = getEventDate(b);
+      
+      if (dateA === Infinity && dateB === Infinity) return 0;
+      if (dateA === Infinity) return 1;
+      if (dateB === Infinity) return -1;
+      
+      return dateA - dateB;
+    });
+  };
+
   const getTypeLabel = (type) => {
     const labels = {
       hackathon: 'Хакатон',
@@ -55,7 +83,6 @@ function OrganizerApp() {
         typeLabel: getTypeLabel(full.type),
         totalSeats: full.max_slots,
         remainingSeats: full.max_slots != null ? full.max_slots - full.registered_count : null,
-        // СОХРАНЯЕМ ИСХОДНУЮ ДАТУ В ISO ФОРМАТЕ
         dateTime: new Date(full.date * 1000).toISOString(),
       });
     } catch (err) {
@@ -139,6 +166,7 @@ function OrganizerApp() {
     }
   };
 
+  // Фильтрация
   const filteredEvents = events.filter((event) => {
     const matchesSearch = event.title
       .toLowerCase()
@@ -149,6 +177,8 @@ function OrganizerApp() {
       filters.type.length === 0 || filters.type.includes(event.type);
     return matchesSearch && matchesFormat && matchesType;
   });
+
+  const sortedEvents = sortByNearestDate(filteredEvents);
 
   return (
     <div className={styles.app}>
@@ -181,12 +211,12 @@ function OrganizerApp() {
         {error && <div className={styles.counter}>Ошибка: {error}</div>}
         {!loading && !error && (
           <div className={styles.counter}>
-            Найдено моих мероприятий: {filteredEvents.length}
+            Найдено моих мероприятий: {sortedEvents.length}
           </div>
         )}
 
         <div className={styles.eventsGrid}>
-          {filteredEvents.map((event) => (
+          {sortedEvents.map((event) => (
             <EventCard
               key={event.id}
               event={event}
