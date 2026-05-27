@@ -509,17 +509,21 @@ func HandleAddReview(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Проверяем, что пользователь был записан на мероприятие
-    var registered bool
-    err = db.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM registrations WHERE user_id = $1 AND event_id = $2)", userID, id).Scan(&registered)
-    if err != nil || !registered {
-        writeError(w, http.StatusForbidden, "only registered attendees can review")
+    // Проверяем, что пользователь был записан И ОТМЕТИЛСЯ (attended = true)
+    var canReview bool
+    err = db.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM registrations WHERE user_id = $1 AND event_id = $2 AND attended = true)", userID, id).Scan(&canReview)
+    if err != nil {
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
+    if !canReview {
+        writeError(w, http.StatusForbidden, "only attendees who marked presence can review")
         return
     }
 
     // Проверяем, не оставлял ли уже отзыв
     var alreadyReviewed bool
-    err = db.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM reviews WHERE user_id = $1 AND event_id = $2)", userID, id).Scan(&alreadyReviewed)
+    err = db.DB.QueryRow("SELECT    EXISTS(SELECT 1 FROM reviews WHERE user_id = $1 AND event_id = $2)", userID, id).Scan(&alreadyReviewed)
     if err != nil {
         writeError(w, http.StatusInternalServerError, "database error")
         return
