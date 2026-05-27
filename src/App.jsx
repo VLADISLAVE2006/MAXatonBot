@@ -22,34 +22,37 @@ function App() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Функция для получения даты мероприятия в едином формате (timestamp)
+  const getTypeLabel = (type) => {
+    const labels = {
+      hackathon: 'Хакатон',
+      olympiad: 'Олимпиада',
+      conference: 'Конференция',
+      openday: 'День открытых дверей'
+    };
+    return labels[type] || type;
+  };
+
   const getEventDate = (event) => {
-    // Если есть поле date (timestamp в секундах)
     if (event.date) {
       return event.date;
     }
-    // Если есть поле dateTime (ISO строка)
     if (event.dateTime) {
       const date = new Date(event.dateTime);
       if (!isNaN(date.getTime())) {
         return Math.floor(date.getTime() / 1000);
       }
     }
-    // Если есть поле timestamp
     if (event.timestamp) {
       return event.timestamp;
     }
-    // Если ничего не подошло - возвращаем Infinity, чтобы такие события были в конце
     return Infinity;
   };
 
-  // Функция для сортировки по ближайшей дате
   const sortByNearestDate = (eventsList) => {
     return [...eventsList].sort((a, b) => {
       const dateA = getEventDate(a);
       const dateB = getEventDate(b);
       
-      // Сравниваем даты (меньше = раньше = ближе)
       if (dateA === Infinity && dateB === Infinity) return 0;
       if (dateA === Infinity) return 1;
       if (dateB === Infinity) return -1;
@@ -65,18 +68,15 @@ function App() {
         ...full,
         location: full.content,
         totalSeats: full.max_slots,
-        remainingSeats:
-          full.max_slots != null
-            ? full.max_slots - full.registered_count
-            : null,
+        remainingSeats: full.max_slots != null ? full.max_slots - full.registered_count : null,
         dateTime: new Date(full.date * 1000).toISOString(),
+        typeLabel: getTypeLabel(full.type), // ДОБАВЛЯЕМ typeLabel
       });
     } catch (err) {
       console.error("Failed to load event:", err);
     }
   };
 
-  // Фильтрация
   const filteredEvents = events.filter((event) => {
     const matchesSearch = event.title
       .toLowerCase()
@@ -88,7 +88,6 @@ function App() {
     return matchesSearch && matchesFormat && matchesType;
   });
 
-  // Сортировка после фильтрации
   const sortedEvents = sortByNearestDate(filteredEvents);
 
   return (
