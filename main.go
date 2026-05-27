@@ -63,6 +63,8 @@ func main() {
 	router.HandleFunc("/api/reminders/mark-sent", middleware.APIAuth(handlers.HandleMarkRemindersSent)).Methods("POST")
 	//подтверждение записи
 	router.HandleFunc("/api/events/{id}/attendance", middleware.UserAuth(handlers.HandleMarkAttendance)).Methods("POST")
+	//вывод архива
+	router.HandleFunc("/api/user/registrations/archived", middleware.UserAuth(handlers.HandleGetArchivedRegistrations)).Methods("GET")
 	//добавление отзыва
 	router.HandleFunc("/api/events/{id}/review", middleware.UserAuth(handlers.HandleAddReview)).Methods("POST")
 
@@ -71,13 +73,15 @@ func main() {
 	router.HandleFunc("/api/organizer/events", middleware.OrganizerAuth(handlers.HandleGetOrganizerEvents)).Methods("GET")
 	router.HandleFunc("/api/events/{id}", middleware.OrganizerAuth(handlers.HandleUpdateEvent)).Methods("PUT")
 	router.HandleFunc("/api/events/{id}", middleware.OrganizerAuth(handlers.HandleDeleteEvent)).Methods("DELETE")
+	//просмотр архива
+	router.HandleFunc("/api/organizer/events/archived", middleware.OrganizerAuth(handlers.HandleGetOrganizerArchivedEvents)).Methods("GET")
 	//просмтор статистики мероприятия
 	router.HandleFunc("/api/events/{id}/stats", middleware.OrganizerAuth(handlers.HandleEventStats)).Methods("GET")
 	//закрытие мероприятия
 	router.HandleFunc("/api/events/{id}/close", middleware.OrganizerAuth(handlers.HandleCloseEvent)).Methods("POST")
 	//просмтор людей, которые зарегались
 	router.HandleFunc("/api/events/{id}/attendees", middleware.OrganizerAuth(handlers.HandleEventAttendees)).Methods("GET")
-	
+
 	//для картинок
 	// Раздача статических файлов из папки uploads
 	router.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
@@ -98,4 +102,3 @@ func main() {
 		log.Fatal(err)
 	}
 }
-

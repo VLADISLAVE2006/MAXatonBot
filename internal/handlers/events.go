@@ -76,20 +76,16 @@ type CreateEventRequest struct {
 func HandleGetEvents(w http.ResponseWriter, r *http.Request) {
     rows, err := db.DB.Query(`
         SELECT
-            e.id,
-            e.title,
-            e.description,
+            e.id, e.title, e.description,
             EXTRACT(epoch FROM e.date)::bigint AS date,
-            e.format,
-            e.type,
-            e.max_slots,
+            e.format, e.type, e.max_slots,
             COUNT(r.id) AS registered_count,
             e.image_url
         FROM events e
         LEFT JOIN registrations r ON e.id = r.event_id
-        WHERE e.closed = false
+        WHERE e.closed = false AND e.date > NOW()
         GROUP BY e.id, e.title, e.description, e.date, e.format, e.type, e.max_slots, e.image_url
-        ORDER BY e.created_at DESC
+        ORDER BY e.date ASC
     `)
     if err != nil {
         log.Printf("HandleGetEvents DB error: %v", err)
@@ -302,7 +298,7 @@ func HandleMyRegistrations(w http.ResponseWriter, r *http.Request) {
 		SELECT r.id, r.event_id, e.title, EXTRACT(epoch FROM e.date)::bigint, r.code, EXTRACT(epoch FROM r.registered_at)::bigint, r.attended
 		FROM registrations r
 		JOIN events e ON r.event_id = e.id
-		WHERE r.user_id = $1
+		WHERE r.user_id = $1 AND e.closed = false
 		ORDER BY e.date ASC
 	`, userID)
 	if err != nil {
@@ -558,6 +554,59 @@ func generateRegistrationCode() string {
 }
 
 
+// HandleGetArchivedRegistrations возвращает список закрытых мероприятий, на которые был записан пользователь
+func HandleGetArchivedRegistrations(w http.ResponseWriter, r *http.Request) {
+    claims := middleware.GetClaims(r)
+    userID := claims.UserID
+
+    rows, err := db.DB.Query(`
+        SELECT
+            e.id, e.title, e.description,
+            EXTRACT(epoch FROM e.date)::bigint AS date,
+            e.format, e.type, e.max_slots,
+            r.code, r.attended,
+            EXTRACT(epoch FROM r.registered_at)::bigint AS registered_at,
+            e.image_url
+        FROM registrations r
+        JOIN events e ON r.event_id = e.id
+        WHERE r.user_id = $1 AND e.closed = true
+        ORDER BY e.date DESC
+    `, userID)
+    if err != nil {
+        log.Printf("HandleGetArchivedRegistrations DB error: %v", err)
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
+    defer rows.Close()
+
+    type ArchivedRegistration struct {
+        EventID      int    `json:"event_id"`
+        Title        string `json:"title"`
+        Description  string `json:"description"`
+        Date         int64  `json:"date"`
+        Format       string `json:"format"`
+        Type         string `json:"type"`
+        MaxSlots     *int   `json:"max_slots"`
+        Code         string `json:"code"`
+        Attended     bool   `json:"attended"`
+        RegisteredAt int64  `json:"registered_at"`
+        ImageURL     string `json:"image_url"`
+    }
+
+    archived := []ArchivedRegistration{}
+    for rows.Next() {
+        var a ArchivedRegistration
+        if err := rows.Scan(&a.EventID, &a.Title, &a.Description, &a.Date, &a.Format, &a.Type, &a.MaxSlots, &a.Code, &a.Attended, &a.RegisteredAt, &a.ImageURL); err != nil {
+            log.Printf("HandleGetArchivedRegistrations scan error: %v", err)
+            continue
+        }
+        archived = append(archived, a)
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(archived)
+}
+
 
 
 
@@ -692,7 +741,7 @@ func HandleGetOrganizerEvents(w http.ResponseWriter, r *http.Request) {
             e.image_url
         FROM events e
         LEFT JOIN registrations r ON e.id = r.event_id
-        WHERE e.created_by = $1
+        WHERE e.created_by = $1 AND e.closed = false
         GROUP BY e.id, e.title, e.description, e.date, e.format, e.type, e.max_slots, e.image_url
         ORDER BY e.created_at DESC
     `, userID)
@@ -931,6 +980,45 @@ func HandleCloseEvent(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(map[string]string{"status": "event closed"})
 }
 
+
+// HandleGetOrganizerArchivedEvents возвращает список закрытых мероприятий, созданных организатором
+func HandleGetOrganizerArchivedEvents(w http.ResponseWriter, r *http.Request) {
+    claims := middleware.GetClaims(r)
+    userID := claims.UserID
+
+    rows, err := db.DB.Query(`
+        SELECT
+            e.id, e.title, e.description,
+            EXTRACT(epoch FROM e.date)::bigint AS date,
+            e.format, e.type, e.max_slots,
+            COALESCE(COUNT(r.id), 0) AS registered_count,
+            e.image_url
+        FROM events e
+        LEFT JOIN registrations r ON e.id = r.event_id
+        WHERE e.created_by = $1 AND e.closed = true
+        GROUP BY e.id, e.title, e.description, e.date, e.format, e.type, e.max_slots, e.image_url
+        ORDER BY e.date DESC
+    `, userID)
+    if err != nil {
+        log.Printf("HandleGetOrganizerArchivedEvents DB error: %v", err)
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
+    defer rows.Close()
+
+    events := []ShortEvent{}
+    for rows.Next() {
+        var e ShortEvent
+        if err := rows.Scan(&e.ID, &e.Title, &e.Description, &e.Date, &e.Format, &e.Type, &e.MaxSlots, &e.RegisteredCount, &e.ImageURL); err != nil {
+            log.Printf("HandleGetOrganizerArchivedEvents scan error: %v", err)
+            continue
+        }
+        events = append(events, e)
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(events)
+}
 
 //просмотр статистики
 type EventStats struct {
