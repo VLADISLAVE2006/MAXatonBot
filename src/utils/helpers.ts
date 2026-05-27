@@ -4,16 +4,15 @@ export function formatDate(timestamp: number): string {
         month: "long",
         hour: "2-digit",
         minute: "2-digit",
-        timeZone: "UTC",
     });
 }
 
 export function formatSlots(maxSlots: number | null, registeredCount: number): string {
     if (maxSlots == null) return "";
     const free = maxSlots - registeredCount;
-    if (free <= 0) return " · ❌ мест нет";
-    if (free <= 5) return ` · ⚠️ осталось: ${free} из ${maxSlots}`;
-    return ` · свободно: ${free} из ${maxSlots}`;
+    if (free <= 0) return "❌ Мест нет";
+    if (free <= 5) return `⚠️ Осталось: ${free} из ${maxSlots}`;
+    return `👥 Свободно: ${free} из ${maxSlots}`;
 }
 
 export const TYPE_LABELS: Record<string, string> = {

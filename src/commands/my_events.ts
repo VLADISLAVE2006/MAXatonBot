@@ -17,17 +17,22 @@ type Registration = {
 };
 type OrganizerEvent = { id: number; title: string; date: number; max_slots: number | null; registered_count: number };
 
+const nums = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"];
+
 export function prepareRegistrationsContent(registrations: Registration[]) {
-    const list = registrations.sort((a, b) => a.event_date - b.event_date).slice(0, 9);
-    const lines = list.map((r, i) => `${i + 1}. ${r.event_title} — ${formatDate(r.event_date)}`).join("\n");
+    const list = registrations.slice(0, 4);
+    const lines = list.map((r, i) => `${nums[i]} ${r.event_title}\n📆 ${formatDate(r.event_date)}`).join("\n\n");
     return { list, lines };
 }
 
 export function prepareOrganizerEventsContent(events: OrganizerEvent[]) {
-    const list = events.sort((a, b) => a.date - b.date).slice(0, 9);
+    const list = events.slice(0, 4);
     const lines = list
-        .map((e, i) => `${i + 1}. ${e.title} — ${formatDate(e.date)}${formatSlots(e.max_slots, e.registered_count)}`)
-        .join("\n");
+        .map(
+            (e, i) =>
+                `${nums[i]} ${e.title}\n📆 ${formatDate(e.date)}\n${formatSlots(e.max_slots, e.registered_count)}`,
+        )
+        .join("\n\n");
     return { list, lines };
 }
 
@@ -52,13 +57,13 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
                 }
 
                 const { list, lines } = prepareRegistrationsContent(registrations);
-                const numberButtons = list.map((r, i) =>
-                    Keyboard.button.callback(`${i + 1}`, `hub_my_event:${r.event_id}`),
-                );
+                const registrationButtons = list.map((r, i) => [
+                    Keyboard.button.callback(`${i + 1}. ${r.event_title}`, `hub_my_event:${r.event_id}`),
+                ]);
 
                 await ctx.editMessage({
                     text: `📋 Мои записи:\n\n${lines}`,
-                    attachments: [Keyboard.inlineKeyboard([numberButtons, [backToHub]])],
+                    attachments: [Keyboard.inlineKeyboard([...registrationButtons, [backToHub]])],
                 });
             } else {
                 const events = await api.events.getOrganizerEvents(token);
@@ -82,13 +87,15 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
                 }
 
                 const { list, lines } = prepareOrganizerEventsContent(events);
-                const numberButtons = list.map((e, i) => Keyboard.button.callback(`${i + 1}`, `hub_my_event:${e.id}`));
+                const eventButtons = list.map((e, i) => [
+                    Keyboard.button.callback(`${i + 1}. ${e.title}`, `hub_my_event:${e.id}`),
+                ]);
 
                 await ctx.editMessage({
                     text: `📋 Мои мероприятия:\n\n${lines}`,
                     attachments: [
                         Keyboard.inlineKeyboard([
-                            numberButtons,
+                            ...eventButtons,
                             [
                                 Keyboard.button.link(
                                     "Управлять мероприятиями",
@@ -115,7 +122,7 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
     try {
         const event = await api.events.getEventById(eventId, token);
         const role = ctx.user!.role;
-        const isPast = event.date * 1000 < Date.now() + 3 * 60 * 60 * 1000;
+        const isPast = event.date * 1000 < Date.now();
         const buttons =
             role === "applicant"
                 ? [
@@ -128,7 +135,7 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
                 : [
                       ...(isPast ? [[Keyboard.button.callback("📊 Статистика", `event_stats:${event.id}`)]] : []),
                       ...(isPast && !event.closed
-                          ? [[Keyboard.button.callback("🔒 Закрыть мероприятие", `close_event:${event.id}`)]]
+                          ? [[Keyboard.button.callback("🔒 Завершить мероприятие", `close_event:${event.id}`)]]
                           : []),
                       ...(!event.closed
                           ? [[Keyboard.button.callback("📲 QR-код посещаемости", `event_qr:${event.id}`)]]
@@ -159,12 +166,13 @@ export async function handleCloseEventCallback(ctx: AppContext): Promise<boolean
     try {
         await api.events.closeEvent(eventId, token);
         await ctx.editMessage({
-            text: "🔒 Мероприятие закрыто. Участники теперь могут оставлять отзывы.",
-            attachments: [Keyboard.inlineKeyboard([[backToMyEvents]])],
+            text: "🔒 Мероприятие завершено. Участники теперь могут оставлять отзывы.",
+            attachments: [Keyboard.inlineKeyboard([[]])],
         });
+        await sendEventStats(ctx, eventId, false);
     } catch {
         await ctx.editMessage({
-            text: "Не удалось закрыть мероприятие.",
+            text: "Не удалось завершить мероприятие.",
             attachments: [Keyboard.inlineKeyboard([[backToMyEvents]])],
         });
     }
@@ -191,6 +199,42 @@ export async function handleQrCallback(ctx: AppContext): Promise<boolean> {
     return true;
 }
 
+async function sendEventStats(ctx: AppContext, eventId: number, edit: boolean) {
+    const token = getToken(ctx.user!.user_id) ?? "";
+    try {
+        const stats = await api.events.getEventStats(eventId, token);
+        const ratingLine =
+            stats.reviews_count > 0
+                ? `⭐ Рейтинг: ${stats.average_rating.toFixed(1)} (${stats.reviews_count} отзывов)\n`
+                : "⭐ Нет отзывов\n";
+        const text =
+            `📊 Статистика мероприятия\n\n` +
+            `👥 Записалось: ${stats.total_registered}\n` +
+            `✅ Пришло: ${stats.total_attended}\n` +
+            `📈 Явка: ${stats.percentage.toFixed(1)}%\n` +
+            ratingLine;
+        const attachments = [
+            Keyboard.inlineKeyboard([
+                [Keyboard.button.callback("👥 Список участников", `event_attendees:${eventId}:0`)],
+                [Keyboard.button.callback("🔙 Назад", `hub_my_event:${eventId}`)],
+            ]),
+        ];
+        if (edit) {
+            await ctx.editMessage({
+                text: text,
+                attachments: attachments,
+            });
+        } else {
+            await ctx.reply(text, { attachments: attachments });
+        }
+    } catch {
+        await ctx.editMessage({
+            text: "Не удалось загрузить статистику.",
+            attachments: [Keyboard.inlineKeyboard([[backToMyEvents]])],
+        });
+    }
+}
+
 export async function handleEventStatsCallback(ctx: AppContext): Promise<boolean> {
     const payload = ctx.callback?.payload;
     if (!payload?.startsWith("event_stats:")) return false;
@@ -198,34 +242,7 @@ export async function handleEventStatsCallback(ctx: AppContext): Promise<boolean
     const eventId = parseInt(payload.replace("event_stats:", ""), 10);
     if (isNaN(eventId)) return false;
 
-    const token = getToken(ctx.user!.user_id) ?? "";
-    try {
-        const stats = await api.events.getEventStats(eventId, token);
-        const ratingLine =
-            stats.reviews_count > 0
-                ? `⭐ Рейтинг: ${stats.average_rating.toFixed(1)} (${stats.reviews_count} отзывов)\n`
-                : "";
-        await ctx.editMessage({
-            text:
-                `📊 Статистика мероприятия\n\n` +
-                `👥 Записалось: ${stats.total_registered}\n` +
-                `✅ Пришло: ${stats.total_attended}\n` +
-                `📈 Явка: ${stats.percentage.toFixed(1)}%\n` +
-                ratingLine,
-            attachments: [
-                Keyboard.inlineKeyboard([
-                    [Keyboard.button.callback("👥 Список участников", `event_attendees:${eventId}:0`)],
-                    [backToMyEvents],
-                ]),
-            ],
-        });
-    } catch (error) {
-        console.error(error);
-        await ctx.editMessage({
-            text: "Не удалось загрузить статистику.",
-            attachments: [Keyboard.inlineKeyboard([[backToMyEvents]])],
-        });
-    }
+    await sendEventStats(ctx, eventId, true);
     return true;
 }
 
@@ -238,6 +255,7 @@ export async function handleAttendeesCallback(ctx: AppContext): Promise<boolean>
     const parts = payload.replace("event_attendees:", "").split(":");
     const eventId = parseInt(parts[0] ?? "", 10);
     const page = parseInt(parts[1] ?? "0", 10);
+    const newMessage = (parts.length == 3 && parts[2] == "new") ?? false;
     if (isNaN(eventId) || isNaN(page)) return false;
 
     const token = getToken(ctx.user!.user_id) ?? "";
@@ -259,18 +277,26 @@ export async function handleAttendeesCallback(ctx: AppContext): Promise<boolean>
         const rows = [
             ...(navRow.length ? [navRow] : []),
             [Keyboard.button.callback("📥 Выгрузить CSV", `event_attendees_csv:${eventId}`)],
-            [Keyboard.button.callback("📊 К статистике", `event_stats:${eventId}`)],
+            [Keyboard.button.callback("🔙 К статистике", `event_stats:${eventId}`)],
         ];
 
-        await ctx.editMessage({
-            text: `👥 Участники (${total}):\n\n${lines}`,
-            attachments: [Keyboard.inlineKeyboard(rows)],
-        });
+        const text = `👥 Участники (${total}):\n\n${lines}`;
+        const attachments = [Keyboard.inlineKeyboard(rows)];
+        if (newMessage) {
+            await ctx.reply(text, {
+                attachments,
+            });
+        } else {
+            await ctx.editMessage({
+                text: `👥 Участники (${total}):\n\n${lines}`,
+                attachments,
+            });
+        }
     } catch {
         await ctx.editMessage({
             text: "Не удалось загрузить список участников.",
             attachments: [
-                Keyboard.inlineKeyboard([[Keyboard.button.callback("📊 К статистике", `event_stats:${eventId}`)]]),
+                Keyboard.inlineKeyboard([[Keyboard.button.callback("🔙 К статистике", `event_stats:${eventId}`)]]),
             ],
         });
     }
@@ -292,7 +318,7 @@ export async function handleAttendeesExportCallback(ctx: AppContext): Promise<bo
                 ["Имя", "Зарегистрирован", "Посетил"],
                 ...attendees.map((a) => [
                     a.full_name,
-                    new Date(a.registered_at * 1000).toLocaleString("ru-RU", { timeZone: "UTC" }),
+                    new Date(a.registered_at * 1000).toLocaleString("ru-RU"),
                     a.attended ? "Да" : "Нет",
                 ]),
             ],
@@ -308,7 +334,14 @@ export async function handleAttendeesExportCallback(ctx: AppContext): Promise<bo
         const uploadData = (await uploadRes.json()) as { token: string };
         const file = new FileAttachment({ token: uploadData.token });
         await new Promise((r) => setTimeout(r, 3000));
-        await ctx.reply("📥 Список участников:", { attachments: [file.toJson()] });
+        await ctx.reply("📥 Список участников:", {
+            attachments: [
+                file.toJson(),
+                Keyboard.inlineKeyboard([
+                    [Keyboard.button.callback("🔙 К списку участников", `event_attendees:${eventId}:0:new`)],
+                ]),
+            ],
+        });
     } catch (error) {
         console.error(error);
         await ctx.reply("Не удалось выгрузить список участников.");

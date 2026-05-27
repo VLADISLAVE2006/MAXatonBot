@@ -7,15 +7,17 @@ import { backToEvents, backToHub } from "./menu";
 
 type ShortEvent = { id: number; title: string; date: number; max_slots: number | null; registered_count: number };
 
+const nums = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"];
+
 export function prepareEventsListContent(events: ShortEvent[]) {
-    const upcoming = events
-        .filter((e) => e.date * 1000 >= Date.now() + 3 * 60 * 60 * 1000)
-        .sort((a, b) => a.date - b.date)
-        .slice(0, 9);
-    const list = upcoming.length > 0 ? upcoming : events.slice(0, 9);
+    const upcoming = events.slice(0, 4);
+    const list = upcoming.length > 0 ? upcoming : events.slice(0, 4);
     const lines = list
-        .map((e, i) => `${i + 1}. ${e.title} — ${formatDate(e.date)}${formatSlots(e.max_slots, e.registered_count)}`)
-        .join("\n");
+        .map(
+            (e, i) =>
+                `${nums[i]} ${e.title}\n📆 ${formatDate(e.date)}\n${formatSlots(e.max_slots, e.registered_count)}`,
+        )
+        .join("\n\n");
     return { list, lines };
 }
 
@@ -38,13 +40,15 @@ export async function handleHubEventsCallback(ctx: AppContext): Promise<boolean>
             }
 
             const { list, lines } = prepareEventsListContent(events);
-            const numberButtons = list.map((e, i) => Keyboard.button.callback(`${i + 1}`, `hub_event:${e.id}`));
+            const eventButtons = list.map((e, i) => [
+                Keyboard.button.callback(`${i + 1}. ${e.title}`, `hub_my_event:${e.id}`),
+            ]);
 
             await ctx.editMessage({
                 text: `📅 Ближайшие мероприятия:\n\n${lines}`,
                 attachments: [
                     Keyboard.inlineKeyboard([
-                        numberButtons,
+                        ...eventButtons,
                         [Keyboard.button.link("Все мероприятия", `${env.CATALOG_URL}?token=${token}`)],
                         [backToHub],
                     ]),
