@@ -97,7 +97,7 @@ type CreateEventRequest struct {
 }
 
 func HandleGetPendingReminders(w http.ResponseWriter, r *http.Request) {
-    rows, err := db.DB.Query(`
+	rows, err := db.DB.Query(`
         SELECT 
             r.id, 
             r.user_id, 
@@ -121,27 +121,27 @@ func HandleGetPendingReminders(w http.ResponseWriter, r *http.Request) {
           AND r.reminder_sent = false
           AND COALESCE(u.notifications_enabled, true) = true
     `)
-    if err != nil {
-        log.Printf("GetPendingReminders DB error: %v", err)
-        writeError(w, http.StatusInternalServerError, "database error")
-        return
-    }
-    defer rows.Close()
+	if err != nil {
+		log.Printf("GetPendingReminders DB error: %v", err)
+		writeError(w, http.StatusInternalServerError, "database error")
+		return
+	}
+	defer rows.Close()
 
-    reminders := []PendingReminder{}
-    for rows.Next() {
-        var r PendingReminder
-        if err := rows.Scan(&r.RegistrationID, &r.UserID, &r.EventID, &r.EventTitle, &r.EventDate, &r.ReminderType); err != nil {
-            log.Printf("scan error: %v", err)
-            continue
-        }
-        if r.ReminderType == "day_before" || r.ReminderType == "hour_before" {
-            reminders = append(reminders, r)
-        }
-    }
+	reminders := []PendingReminder{}
+	for rows.Next() {
+		var r PendingReminder
+		if err := rows.Scan(&r.RegistrationID, &r.UserID, &r.EventID, &r.EventTitle, &r.EventDate, &r.ReminderType); err != nil {
+			log.Printf("scan error: %v", err)
+			continue
+		}
+		if r.ReminderType == "day_before" || r.ReminderType == "hour_before" {
+			reminders = append(reminders, r)
+		}
+	}
 
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(reminders)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(reminders)
 }
 
 // Для абитуриента
@@ -427,7 +427,6 @@ func HandleMyRegistrations(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(registrations)
 }
-
 
 type MarkSentRequest struct {
 	RegistrationIDs []int `json:"registration_ids"`
