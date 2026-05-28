@@ -1,0 +1,20 @@
+# Зависимости
+node_modules/
+.vite/
+dist/
+
+# Файлы сборки
+*.log
+*.local
+
+# Системные файлы
+.DS_Store
+Thumbs.db
+
+# Переменные окружения
+.env
+.env.local
+.env.*.local
+
+# Vercel
+.vercel/

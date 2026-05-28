@@ -1,0 +1,313 @@
+import React from "react";
+import { Icon } from "@iconify/react";
+
+const API_URL = import.meta.env.VITE_API_URL ?? '';
+
+const TYPE_ICONS = {
+  hackathon: "lucide:rocket",
+  olympiad: "lucide:trophy",
+  conference: "lucide:mic",
+  openday: "lucide:door-open",
+};
+
+const resolveImageUrl = (raw) => {
+  if (!raw) return null;
+  if (raw.startsWith('http')) return raw;
+  return `${API_URL}${raw}`;
+};
+
+const EventModal = ({ event, onClose }) => {
+  const handleRegister = () => {
+    if (isRegistrationClosed()) return;
+    window.location.href = `https://max.ru/${import.meta.env.VITE_BOT_USERNAME}?start=register_${event.id}`;
+  };
+
+  const formatDateTime = (dateTimeStr) => {
+    if (!dateTimeStr) return 'Дата не указана';
+    const date = new Date(dateTimeStr);
+    if (isNaN(date.getTime())) {
+      return 'Дата не указана';
+    }
+    return date.toLocaleString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const totalSeats = event.totalSeats || event.max_slots;
+  const remainingSeats = event.remainingSeats !== undefined ? event.remainingSeats :
+    (event.max_slots && event.registered_count !== undefined ? event.max_slots - event.registered_count : null);
+
+  const imageUrl = resolveImageUrl(event.image_url || event.imageUrl);
+
+  // Проверки для кнопки регистрации
+  const isFull = () => {
+    if (remainingSeats === null) return false;
+    return remainingSeats <= 0;
+  };
+
+  const isEventStarted = () => {
+    if (!event.dateTime) return false;
+    const eventDate = new Date(event.dateTime);
+    const now = new Date();
+    return eventDate < now;
+  };
+
+  const isRegistrationClosed = () => {
+    return isFull() || isEventStarted() || event.closed;
+  };
+
+  const getButtonText = () => {
+    if (isFull()) return "Мест нет";
+    if (isEventStarted()) return "⏰ Мероприятие началось";
+    if (event.closed) return "🔒 Запись закрыта";
+    return "✏️ Записаться на мероприятие";
+  };
+
+  const getButtonIcon = () => {
+    if (isFull()) return "lucide:alert-circle";
+    if (isEventStarted()) return "lucide:clock";
+    if (event.closed) return "lucide:lock";
+    return "lucide:pencil";
+  };
+
+  const styles = {
+    modalOverlay: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "var(--modal-overlay, rgba(0, 0, 0, 0.5))",
+      backdropFilter: "blur(4px)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 1000,
+    },
+    modal: {
+      background: "var(--bg-modal, white)",
+      borderRadius: "28px",
+      overflow: "hidden",
+      position: "relative",
+      maxHeight: "85vh",
+      display: "flex",
+      flexDirection: "column",
+      width: "90%",
+      maxWidth: "500px",
+      boxShadow: "var(--shadow-modal, 0 20px 40px rgba(0, 0, 0, 0.3))",
+    },
+    closeBtn: {
+      position: "absolute",
+      top: "12px",
+      right: "12px",
+      background: "var(--btn-close-bg, rgba(0, 0, 0, 0.6))",
+      border: "none",
+      color: "var(--btn-close-color, white)",
+      width: "36px",
+      height: "36px",
+      borderRadius: "50%",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: "pointer",
+      zIndex: 10,
+      fontSize: "18px",
+      fontWeight: "bold",
+      transition: "all 0.2s ease",
+    },
+    modalImage: {
+      height: "200px",
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+      backgroundImage: imageUrl ? `url(${imageUrl})` : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      position: "relative",
+    },
+    imageOverlay: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      background: "linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent)",
+      padding: "16px",
+    },
+    modalTitle: {
+      color: "white",
+      fontSize: "1.4rem",
+      fontWeight: "700",
+      margin: 0,
+      textShadow: "0 2px 5px rgba(0, 0, 0, 0.3)",
+    },
+    content: {
+      flex: 1,
+      overflowY: "auto",
+      padding: "16px 20px 20px 20px",
+      background: "var(--bg-modal, white)",
+    },
+    scrollArea: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "16px",
+    },
+    description: {
+      fontSize: "0.9rem",
+      lineHeight: "1.5",
+      color: "var(--text-secondary, #2c3e4e)",
+      margin: 0,
+    },
+    details: {
+      background: "var(--bg-details, #f8fafd)",
+      borderRadius: "20px",
+      padding: "14px 16px",
+      display: "flex",
+      flexDirection: "column",
+      gap: "12px",
+    },
+    detailItem: {
+      display: "flex",
+      alignItems: "center",
+      gap: "12px",
+      fontSize: "0.85rem",
+      color: "var(--text-secondary, #1f3b4c)",
+    },
+    detailIcon: {
+      width: "20px",
+      fontSize: "0.95rem",
+    },
+    lowSeats: {
+      color: "#e67e22",
+      fontWeight: 700,
+    },
+    normalSeats: {
+      color: "#27ae60",
+      fontWeight: 600,
+    },
+    noSeats: {
+      color: "#e74c3c",
+      fontWeight: 700,
+    },
+    registerBtn: {
+      background: "var(--btn-primary, linear-gradient(135deg, #2c7ab1, #1e5a7e))",
+      border: "none",
+      color: "white",
+      padding: "12px 20px",
+      borderRadius: "50px",
+      fontSize: "0.95rem",
+      fontWeight: 600,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "10px",
+      cursor: "pointer",
+      transition: "all 0.2s",
+      marginTop: "4px",
+    },
+    registerBtnDisabled: {
+      background: "var(--btn-disabled, #cccccc)",
+      border: "none",
+      color: "var(--text-disabled, #666666)",
+      padding: "12px 20px",
+      borderRadius: "50px",
+      fontSize: "0.95rem",
+      fontWeight: 600,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "10px",
+      cursor: "not-allowed",
+      opacity: 0.6,
+      marginTop: "4px",
+    },
+  };
+
+  const getSeatStyle = () => {
+    if (remainingSeats === null) return styles.normalSeats;
+    if (remainingSeats <= 0) return styles.noSeats;
+    if (remainingSeats <= 5) return styles.lowSeats;
+    return styles.normalSeats;
+  };
+
+  const getSeatText = () => {
+    if (remainingSeats === null) return "∞ (безлимит)";
+    if (remainingSeats <= 0) return "Мест нет";
+    return `Свободно: ${remainingSeats} из ${totalSeats}`;
+  };
+
+  return (
+    <div style={styles.modalOverlay} onClick={onClose}>
+      <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <button style={styles.closeBtn} onClick={onClose}>
+          <Icon icon="lucide:x" width={18} height={18} />
+        </button>
+
+        <div style={styles.modalImage}>
+          <div style={styles.imageOverlay}>
+            <h2 style={styles.modalTitle}>{event.title}</h2>
+          </div>
+        </div>
+
+        <div style={styles.content}>
+          <div style={styles.scrollArea}>
+            <p style={styles.description}>{event.description}</p>
+
+            <div style={styles.details}>
+              <div style={styles.detailItem}>
+                <Icon icon="lucide:calendar" width={18} height={18} style={{ flexShrink: 0 }} />
+                <span>
+                  <strong>Дата и время:</strong> {formatDateTime(event.dateTime)}
+                </span>
+              </div>
+
+              <div style={styles.detailItem}>
+                <Icon icon="lucide:map-pin" width={18} height={18} style={{ flexShrink: 0 }} />
+                <span>
+                  <strong>Место проведения:</strong> {event.location}
+                </span>
+              </div>
+
+              <div style={styles.detailItem}>
+                <Icon icon="lucide:users" width={18} height={18} style={{ flexShrink: 0 }} />
+                <span>
+                  <strong>Количество мест:</strong>{" "}
+                  <span style={getSeatStyle()}>{getSeatText()}</span>
+                </span>
+              </div>
+
+              <div style={styles.detailItem}>
+                <Icon icon="lucide:globe" width={18} height={18} style={{ flexShrink: 0 }} />
+                <span>
+                  <strong>Формат:</strong>{" "}
+                  {event.format === "online"
+                    ? <><Icon icon="lucide:monitor" width={14} height={14} /> Онлайн</>
+                    : <><Icon icon="lucide:building-2" width={14} height={14} /> Оффлайн</>}
+                </span>
+              </div>
+
+              <div style={styles.detailItem}>
+                <Icon icon="lucide:tag" width={18} height={18} style={{ flexShrink: 0 }} />
+                <span>
+                  <strong>Тип:</strong> <Icon icon={TYPE_ICONS[event.type] || "lucide:pin"} width={14} height={14} /> {event.typeLabel}
+                </span>
+              </div>
+            </div>
+
+            {isRegistrationClosed() ? (
+              <button style={styles.registerBtnDisabled} disabled>
+                <Icon icon={getButtonIcon()} width={16} height={16} /> {getButtonText()}
+              </button>
+            ) : (
+              <button style={styles.registerBtn} onClick={handleRegister}>
+                <Icon icon="lucide:pencil" width={16} height={16} /> Записаться на мероприятие
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default EventModal;
