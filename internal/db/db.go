@@ -12,10 +12,9 @@ import (
 	_ "github.com/lib/pq" // драйвер PostgreSQL
 )
 
-// DB - глобальный объект базы данных (можно использовать и без глобальной переменной, но для простоты)
+// DB - глобальный объект базы данных 
 var DB *sql.DB
 
-// InitDB устанавливает соединение с БД и создаёт таблицы, если их нет
 func InitDB() error {
 	// Формируем строку подключения
 	connStr := fmt.Sprintf(
@@ -79,7 +78,11 @@ func InitDB() error {
 	if err != nil {
 		return fmt.Errorf("failed to create events table: %w", err)
 	}
+	
 	log.Println("Table 'events' is ready")
+	if err := ensureDefaultAgreement(); err != nil {
+		log.Printf("Warning: could not ensure default agreement: %v", err)
+	}
 
 	// Таблица регистраций
 	createRegistrationsTableSQL := `
@@ -121,6 +124,23 @@ func InitDB() error {
 		return fmt.Errorf("failed to create reviews table: %w", err)
 	}
 	log.Println("Table 'reviews' is ready")
+
+
+	// Таблица версий пользовательского соглашения
+	createAgreementsTableSQL := `
+	CREATE TABLE IF NOT EXISTS agreements (
+		id SERIAL PRIMARY KEY,
+		version TEXT NOT NULL UNIQUE,
+		file_path TEXT NOT NULL,
+		created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+		is_active BOOLEAN DEFAULT false
+	);`
+	_, err = DB.Exec(createAgreementsTableSQL)
+	if err != nil {
+		return fmt.Errorf("failed to create agreements table: %w", err)
+	}
+	log.Println("Table 'agreements' is ready")
+
 
 	if err := ensureAdmin(); err != nil {
 		log.Printf("Warning: could not ensure admin: %v", err)
@@ -187,4 +207,33 @@ func ensureOrganizers() error {
 		log.Printf("Ensured organizer user_id=%d", userID)
 	}
 	return nil
+}
+
+
+
+func ensureDefaultAgreement() error {
+    var count int
+    err := DB.QueryRow("SELECT COUNT(*) FROM agreements WHERE is_active = true").Scan(&count)
+    if err != nil {
+        return err
+    }
+    if count > 0 {
+        return nil 
+    }
+    // Создаём папку, если нет
+    os.MkdirAll("uploads/agreements", 0755)
+    // Путь к файлу по умолчанию (вы должны сами создать этот файл)
+    defaultPath := "uploads/agreements/agreement_1.0.pdf"
+    // Проверяем, существует ли файл; 
+    if _, err := os.Stat(defaultPath); os.IsNotExist(err) {
+        // Создаём временный файл 
+        f, _ := os.Create(defaultPath)
+        f.WriteString("Default agreement v1.0. Replace with actual PDF.")
+        f.Close()
+    }
+    _, err = DB.Exec(`
+        INSERT INTO agreements (version, file_path, is_active)
+        VALUES ('1.0', $1, true)
+    `, "/"+defaultPath)
+    return err
 }

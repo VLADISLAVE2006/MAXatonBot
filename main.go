@@ -46,8 +46,14 @@ func main() {
 	router.HandleFunc("/api/user/consent", middleware.APIAuth(handlers.HandleConsent)).Methods("POST")
 	router.HandleFunc("/api/user/profile", middleware.UserAuth(handlers.HandleProfile)).Methods("POST")
 	router.HandleFunc("/api/user/me", middleware.APIAuth(handlers.HandleGetMe)).Methods("GET")
-	router.HandleFunc("/api/admin/organizers", middleware.AdminAuth(handlers.HandleAdminCreateOrganizer)).Methods("POST")
 
+
+	router.HandleFunc("/api/admin/organizers", middleware.AdminAuth(handlers.HandleAdminCreateOrganizer)).Methods("POST")
+	// Публичный эндпоинт для получения текущего соглашения (без авторизации, но можно с APIAuth для безопасности)
+	router.HandleFunc("/api/agreement/current", handlers.HandleGetCurrentAgreement).Methods("GET")
+
+	// Админский эндпоинт для загрузки новой версии
+	router.HandleFunc("/api/admin/agreement", middleware.AdminAuth(handlers.HandleUploadAgreement)).Methods("POST")
 
 	//для абитуриента
 	router.HandleFunc("/api/events", middleware.UserAuth(handlers.HandleGetEvents)).Methods("GET")
