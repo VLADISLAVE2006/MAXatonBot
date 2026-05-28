@@ -432,7 +432,7 @@ type MarkSentRequest struct {
 	RegistrationIDs []int `json:"registration_ids"`
 }
 
-// HandleGetEventRegistrations возвращает user_id всех записавшихся на мероприятие (внутренний эндпоинт для бота)
+// HandleGetEventRegistrations возвращает user_id записавшихся с включёнными уведомлениями (внутренний эндпоинт для бота)
 func HandleGetEventRegistrations(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(mux.Vars(r)["id"])
 	if err != nil {
@@ -440,9 +440,11 @@ func HandleGetEventRegistrations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := db.DB.Query(
-		`SELECT user_id FROM registrations WHERE event_id = $1`, id,
-	)
+	rows, err := db.DB.Query(`
+		SELECT r.user_id FROM registrations r
+		JOIN users u ON r.user_id = u.user_id
+		WHERE r.event_id = $1 AND COALESCE(u.notifications_enabled, true) = true
+	`, id)
 	if err != nil {
 		log.Printf("HandleGetEventRegistrations DB error: %v", err)
 		writeError(w, http.StatusInternalServerError, "database error")
@@ -1217,7 +1219,7 @@ func HandleUpdateEvent(w http.ResponseWriter, r *http.Request) {
 		newData["image_url"] = newImageURL
 	}
 	if len(changedFields) > 0 {
-		go SendWebhookNotification(id, changedFields, oldData, newData)
+		go SendWebhookNotification(id, title, changedFields, oldData, newData)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
