@@ -5,7 +5,7 @@ import { env } from "@/env";
 const _fetch = <T>(path: string, options?: RequestInit & { token?: string }) => {
     const headers = new Headers(options?.headers);
 
-    if (process.env.API_KEY) {
+    if (env.API_KEY) {
         headers.set("X-API-Key", env.API_KEY);
     }
 
@@ -17,6 +17,28 @@ const _fetch = <T>(path: string, options?: RequestInit & { token?: string }) => 
         ...options,
         headers,
     });
+};
+
+type ShortEvent = {
+    id: number;
+    title: string;
+    description: string;
+    date: number;
+    format: string;
+    type: string;
+    max_slots: number | null;
+    registered_count: number;
+    image_url: string;
+};
+
+type Event = ShortEvent & {
+    content: string;
+    cancellation_rules: string | null;
+    created_by: number;
+    created_at: number;
+    updated_at: number;
+    is_registered: boolean;
+    closed: boolean;
 };
 
 export const api = {
@@ -65,10 +87,15 @@ export const api = {
     },
     reminders: {
         getPending: () =>
-            _fetch<{ registration_id: number; user_id: number; event_id: number; event_title: string; event_date: number }[]>(
-                "/api/reminders/pending",
-                { method: "GET" },
-            ),
+            _fetch<
+                {
+                    registration_id: number;
+                    user_id: number;
+                    event_id: number;
+                    event_title: string;
+                    event_date: number;
+                }[]
+            >("/api/reminders/pending", { method: "GET" }),
         markSent: (registrationIds: number[]) =>
             _fetch("/api/reminders/mark-sent", {
                 method: "POST",
@@ -87,34 +114,41 @@ export const api = {
     },
     events: {
         getEvents: (token: string) =>
-            _fetch<{ id: number; title: string; description: string; date: number; format: string; type: string; max_slots: number | null; registered_count: number; image_url: string }[]>("/api/events", {
+            _fetch<ShortEvent[]>("/api/events", {
                 method: "GET",
                 token,
             }),
         getOrganizerEvents: (token: string) =>
-            _fetch<{ id: number; title: string; description: string; date: number; format: string; type: string; max_slots: number | null; registered_count: number; image_url: string }[]>("/api/organizer/events", {
+            _fetch<ShortEvent[]>("/api/organizer/events", {
+                method: "GET",
+                token,
+            }),
+        getArchivedRegistrations: (token: string) =>
+            _fetch<
+                {
+                    event_id: number;
+                    title: string;
+                    description: string;
+                    date: number;
+                    format: string;
+                    type: string;
+                    max_slots: number | null;
+                    code: string;
+                    attended: boolean;
+                    registered_at: number;
+                    image_url: string;
+                }[]
+            >("/api/user/registrations/archived", {
+                method: "GET",
+                token,
+            }),
+        getOrganizerArchivedEvents: (token: string) =>
+            _fetch<ShortEvent[]>("/api/organizer/events/archived", {
                 method: "GET",
                 token,
             }),
         getEventById: (id: number, token: string) =>
-            _fetch<{
-                id: number;
-                title: string;
-                description: string;
-                content: string;
-                max_slots: number | null;
-                cancellation_rules: string | null;
-                date: number;
-                format: string;
-                type: string;
-                created_by: number;
-                created_at: number;
-                updated_at: number;
-                registered_count: number;
-                is_registered: boolean;
-                closed: boolean;
-                image_url: string;
-            }>(`/api/events/${id}`, {
+            _fetch<Event>(`/api/events/${id}`, {
                 method: "GET",
                 token,
             }),
@@ -136,10 +170,17 @@ export const api = {
                 token,
             }),
         getMyRegistrations: (token: string) =>
-            _fetch<{ id: number; event_id: number; event_title: string; event_date: number; code: string; registered_at: number; attended: boolean }[]>(
-                "/api/user/registrations",
-                { method: "GET", token },
-            ),
+            _fetch<
+                {
+                    id: number;
+                    event_id: number;
+                    event_title: string;
+                    event_date: number;
+                    code: string;
+                    registered_at: number;
+                    attended: boolean;
+                }[]
+            >("/api/user/registrations", { method: "GET", token }),
         deleteEvent: (id: number, token: string) =>
             _fetch(`/api/events/${id}`, {
                 method: "DELETE",
@@ -153,10 +194,13 @@ export const api = {
                 token,
             }),
         getEventStats: (id: number, token: string) =>
-            _fetch<{ total_registered: number; total_attended: number; percentage: number; reviews_count: number; average_rating: number }>(
-                `/api/events/${id}/stats`,
-                { method: "GET", token },
-            ),
+            _fetch<{
+                total_registered: number;
+                total_attended: number;
+                percentage: number;
+                reviews_count: number;
+                average_rating: number;
+            }>(`/api/events/${id}/stats`, { method: "GET", token }),
         getEventAttendees: (id: number, token: string) =>
             _fetch<{ user_id: number; full_name: string; registered_at: number; attended: boolean }[]>(
                 `/api/events/${id}/attendees`,

@@ -6,6 +6,7 @@ import { env } from "@/env";
 import { buildEventDetailText, formatDate, formatSlots } from "@/utils/helpers";
 import { FileAttachment, Keyboard } from "@maxhub/max-bot-api";
 import { backToHub, backToMyEvents, toHubNew } from "./menu";
+import type { Role } from "@/types/app";
 
 type Registration = {
     id: number;
@@ -16,12 +17,34 @@ type Registration = {
     registered_at: number;
 };
 type OrganizerEvent = { id: number; title: string; date: number; max_slots: number | null; registered_count: number };
+type ArchivedRegistration = { event_id: number; title: string; date: number; attended: boolean };
 
 const nums = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"];
+
+function getBackButtonForEventDetail(role: Role | undefined | null, source: "regular" | "archived" = "regular") {
+    if (role === "organizer") {
+        if (source === "archived") {
+            return Keyboard.button.callback("🔙 Прошедшие мероприятия", "menu:my_archived");
+        }
+        return Keyboard.button.callback("🔙 Мои мероприятия", "menu:my_events");
+    }
+    if (source === "archived") {
+        return Keyboard.button.callback("🔙 Прошедшие записи", "menu:my_archived");
+    }
+    return Keyboard.button.callback("🔙 Мои записи", "menu:my_events");
+}
 
 export function prepareRegistrationsContent(registrations: Registration[]) {
     const list = registrations.slice(0, 4);
     const lines = list.map((r, i) => `${nums[i]} ${r.event_title}\n📆 ${formatDate(r.event_date)}`).join("\n\n");
+    return { list, lines };
+}
+
+export function prepareArchivedRegistrationsContent(registrations: ArchivedRegistration[]) {
+    const list = registrations.slice(0, 4);
+    const lines = list
+        .map((r, i) => `${nums[i]} ${r.title}\n📆 ${formatDate(r.date)}\n${r.attended ? "✅ Посетил" : "❌ Не посетил"}`)
+        .join("\n\n");
     return { list, lines };
 }
 
@@ -48,10 +71,12 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
             if (role === "applicant") {
                 const registrations = await api.events.getMyRegistrations(token);
 
+                const archiveButton = Keyboard.button.callback("🗄️ Прошедшие записи", "menu:my_archived");
+
                 if (registrations.length === 0) {
                     await ctx.editMessage({
                         text: "Вы ещё не записаны ни на одно мероприятие.",
-                        attachments: [Keyboard.inlineKeyboard([[backToHub]])],
+                        attachments: [Keyboard.inlineKeyboard([[archiveButton], [backToHub]])],
                     });
                     return true;
                 }
@@ -63,7 +88,7 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
 
                 await ctx.editMessage({
                     text: `📋 Мои записи:\n\n${lines}`,
-                    attachments: [Keyboard.inlineKeyboard([...registrationButtons, [backToHub]])],
+                    attachments: [Keyboard.inlineKeyboard([...registrationButtons, [archiveButton], [backToHub]])],
                 });
             } else {
                 const events = await api.events.getOrganizerEvents(token);
@@ -102,6 +127,7 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
                                     `${env.CATALOG_URL}/organizer?token=${token}`,
                                 ),
                             ],
+                            [Keyboard.button.callback("🗄️ Прошедшие мероприятия", "menu:my_archived")],
                             [backToHub],
                         ]),
                     ],
@@ -123,6 +149,12 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
         const event = await api.events.getEventById(eventId, token);
         const role = ctx.user!.role;
         const isPast = event.date * 1000 < Date.now();
+
+        const parts = payload!.split(":");
+        const source = parts.length > 2 && parts[2] === "archived" ? "archived" : "regular";
+
+        const backButton = getBackButtonForEventDetail(role, source as "regular" | "archived");
+
         const buttons =
             role === "applicant"
                 ? [
@@ -130,7 +162,7 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
                           ? [[Keyboard.button.callback("✍️ Оставить отзыв", `review:${event.id}`)]]
                           : []),
                       ...(!isPast ? [[Keyboard.button.callback("❌ Отменить запись", `cancel:${event.id}`)]] : []),
-                      [backToMyEvents],
+                      [backButton],
                   ]
                 : [
                       ...(isPast ? [[Keyboard.button.callback("📊 Статистика", `event_stats:${event.id}`)]] : []),
@@ -140,7 +172,7 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
                       ...(!event.closed
                           ? [[Keyboard.button.callback("📲 QR-код посещаемости", `event_qr:${event.id}`)]]
                           : []),
-                      [backToMyEvents],
+                      [backButton],
                   ];
         await ctx.editMessage({
             text: buildEventDetailText(event),
@@ -149,7 +181,7 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
     } catch {
         await ctx.editMessage({
             text: "Не удалось загрузить информацию о мероприятии.",
-            attachments: [Keyboard.inlineKeyboard([[backToMyEvents]])],
+            attachments: [Keyboard.inlineKeyboard([[getBackButtonForEventDetail(ctx.user!.role)]])],
         });
     }
     return true;
@@ -372,4 +404,69 @@ export async function handleCancelRegistrationCallback(ctx: AppContext): Promise
         });
         return true;
     }
+}
+
+export async function handleMyArchivedCallback(ctx: AppContext): Promise<boolean> {
+    const payload = ctx.callback?.payload;
+    if (payload !== "menu:my_archived") return false;
+    const token = getToken(ctx.user!.user_id) ?? "";
+    const role = ctx.user!.role;
+
+    try {
+        if (role === "applicant") {
+            const registrations = await api.events.getArchivedRegistrations(token);
+
+            if (registrations.length === 0) {
+                await ctx.editMessage({
+                    text: "У вас нет прошедших записей.",
+                    attachments: [Keyboard.inlineKeyboard([[backToMyEvents]])],
+                });
+                return true;
+            }
+
+            const { list, lines } = prepareArchivedRegistrationsContent(registrations);
+            const eventButtons = list.map((r, i) => [
+                Keyboard.button.callback(`${i + 1}. ${r.title}`, `hub_my_event:${r.event_id}:archived`),
+            ]);
+
+            await ctx.editMessage({
+                text: `📋 Прошедшие записи:\n\n${lines}`,
+                attachments: [Keyboard.inlineKeyboard([...eventButtons, [backToMyEvents]])],
+            });
+        } else {
+            const events = await api.events.getOrganizerArchivedEvents(token);
+
+            if (events.length === 0) {
+                await ctx.editMessage({
+                    text: "У вас нет прошедших мероприятий.",
+                    attachments: [Keyboard.inlineKeyboard([[backToMyEvents]])],
+                });
+                return true;
+            }
+
+            const { list, lines } = prepareOrganizerEventsContent(events);
+            const eventButtons = list.map((e, i) => [
+                Keyboard.button.callback(`${i + 1}. ${e.title}`, `hub_my_event:${e.id}:archived`),
+            ]);
+
+            await ctx.editMessage({
+                text: `📋 Прошедшие мероприятия:\n\n${lines}`,
+                attachments: [
+                    Keyboard.inlineKeyboard([
+                        ...eventButtons,
+                        [Keyboard.button.link("Управлять мероприятиями", `${env.CATALOG_URL}/organizer?token=${token}`)],
+                        [getBackButtonForEventDetail(role, "regular")],
+                    ]),
+                ],
+            });
+        }
+    } catch (error) {
+        console.error(error);
+        await ctx.editMessage({
+            text: "Не удалось загрузить список прошедших мероприятий.",
+            attachments: [Keyboard.inlineKeyboard([[backToMyEvents]])],
+        });
+    }
+
+    return true;
 }
