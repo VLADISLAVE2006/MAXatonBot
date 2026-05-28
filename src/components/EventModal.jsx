@@ -61,7 +61,7 @@ const EventModal = ({ event, onClose }) => {
   };
 
   const getButtonText = () => {
-    if (isFull()) return "❌ Мест нет";
+    if (isFull()) return "Мест нет";
     if (isEventStarted()) return "⏰ Мероприятие началось";
     if (event.closed) return "🔒 Запись закрыта";
     return "✏️ Записаться на мероприятие";
@@ -232,7 +232,7 @@ const EventModal = ({ event, onClose }) => {
 
   const getSeatText = () => {
     if (remainingSeats === null) return "∞ (безлимит)";
-    if (remainingSeats <= 0) return "❌ Мест нет";
+    if (remainingSeats <= 0) return "Мест нет";
     return `Свободно: ${remainingSeats} из ${totalSeats}`;
   };
 
