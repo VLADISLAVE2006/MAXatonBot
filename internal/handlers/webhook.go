@@ -9,14 +9,15 @@ import (
 )
 
 type EventChangePayload struct {
+	Type          string                 `json:"type"`
 	EventID       int                    `json:"event_id"`
 	EventTitle    string                 `json:"event_title"`
-	ChangedFields []string               `json:"changed_fields"`
-	OldData       map[string]interface{} `json:"old_data"`
-	NewData       map[string]interface{} `json:"new_data"`
+	ChangedFields []string               `json:"changed_fields,omitempty"`
+	OldData       map[string]interface{} `json:"old_data,omitempty"`
+	NewData       map[string]interface{} `json:"new_data,omitempty"`
 }
 
-func SendWebhookNotification(eventID int, eventTitle string, changedFields []string, oldData, newData map[string]interface{}) {
+func SendWebhookNotification(notifType string, eventID int, eventTitle string, changedFields []string, oldData, newData map[string]interface{}) {
 	webhookURL := os.Getenv("BOT_WEBHOOK_URL")
 	if webhookURL == "" {
 		log.Println("BOT_WEBHOOK_URL not set, skipping webhook notification")
@@ -24,6 +25,7 @@ func SendWebhookNotification(eventID int, eventTitle string, changedFields []str
 	}
 
 	payload := EventChangePayload{
+		Type:          notifType,
 		EventID:       eventID,
 		EventTitle:    eventTitle,
 		ChangedFields: changedFields,

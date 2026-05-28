@@ -1219,7 +1219,7 @@ func HandleUpdateEvent(w http.ResponseWriter, r *http.Request) {
 		newData["image_url"] = newImageURL
 	}
 	if len(changedFields) > 0 {
-		go SendWebhookNotification(id, title, changedFields, oldData, newData)
+		go SendWebhookNotification("event_update", id, title, changedFields, oldData, newData)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -1279,7 +1279,8 @@ func HandleCloseEvent(w http.ResponseWriter, r *http.Request) {
 	// Проверяем, что мероприятие существует и принадлежит пользователю
 	var createdBy int64
 	var closed bool
-	err = db.DB.QueryRow("SELECT created_by, closed FROM events WHERE id = $1", id).Scan(&createdBy, &closed)
+	var eventTitle string
+	err = db.DB.QueryRow("SELECT created_by, closed, title FROM events WHERE id = $1", id).Scan(&createdBy, &closed, &eventTitle)
 	if err == sql.ErrNoRows {
 		writeError(w, http.StatusNotFound, "event not found")
 		return
@@ -1305,6 +1306,8 @@ func HandleCloseEvent(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to close event")
 		return
 	}
+
+	go SendWebhookNotification("event_closed", id, eventTitle, nil, nil, nil)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "event closed"})
