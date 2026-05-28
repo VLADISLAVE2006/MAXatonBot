@@ -263,30 +263,65 @@ func HandleRegisterEvent(w http.ResponseWriter, r *http.Request) {
 
 // HandleCancelEvent отменяет запись пользователя на мероприятие
 func HandleCancelEvent(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r)
-	userID := claims.UserID
+    claims := middleware.GetClaims(r)
+    userID := claims.UserID
 
-	vars := mux.Vars(r)
-	eventID, err := strconv.Atoi(vars["id"])
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid event id")
-		return
-	}
+    vars := mux.Vars(r)
+    eventID, err := strconv.Atoi(vars["id"])
+    if err != nil {
+        writeError(w, http.StatusBadRequest, "invalid event id")
+        return
+    }
 
-	result, err := db.DB.Exec("DELETE FROM registrations WHERE user_id = $1 AND event_id = $2", userID, eventID)
-	if err != nil {
-		log.Printf("CancelEvent DB error: %v", err)
-		writeError(w, http.StatusInternalServerError, "failed to cancel registration")
-		return
-	}
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		writeError(w, http.StatusNotFound, "registration not found")
-		return
-	}
+    // Проверяем, существует ли мероприятие, его дату и статус закрытия
+    var eventDate time.Time
+    var closed bool
+    err = db.DB.QueryRow("SELECT date, closed FROM events WHERE id = $1", eventID).Scan(&eventDate, &closed)
+    if err == sql.ErrNoRows {
+        writeError(w, http.StatusNotFound, "event not found")
+        return
+    }
+    if err != nil {
+        log.Printf("CancelEvent check error: %v", err)
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "registration cancelled"})
+    // Запрещаем отмену, если мероприятие уже началось (текущее время >= дата мероприятия)
+    if time.Now().After(eventDate) || time.Now().Equal(eventDate) {
+        writeError(w, http.StatusForbidden, "cannot cancel registration after event has started")
+        return
+    }
+
+    // Запрещаем отмену, если мероприятие закрыто
+    if closed {
+        writeError(w, http.StatusForbidden, "cannot cancel registration for a closed event")
+        return
+    }
+
+    // Проверяем, что пользователь действительно записан
+    var exists bool
+    err = db.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM registrations WHERE user_id = $1 AND event_id = $2)", userID, eventID).Scan(&exists)
+    if err != nil {
+        log.Printf("CancelEvent existence error: %v", err)
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
+    if !exists {
+        writeError(w, http.StatusNotFound, "registration not found")
+        return
+    }
+
+    // Удаляем запись
+    _, err = db.DB.Exec("DELETE FROM registrations WHERE user_id = $1 AND event_id = $2", userID, eventID)
+    if err != nil {
+        log.Printf("CancelEvent delete error: %v", err)
+        writeError(w, http.StatusInternalServerError, "failed to cancel registration")
+        return
+    }
+
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(map[string]string{"status": "registration cancelled"})
 }
 
 // HandleMyRegistrations возвращает список мероприятий, на которые записан пользователь

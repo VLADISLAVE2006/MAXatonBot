@@ -48,6 +48,7 @@ func main() {
 	router.HandleFunc("/api/user/me", middleware.APIAuth(handlers.HandleGetMe)).Methods("GET")
 	router.HandleFunc("/api/admin/organizers", middleware.AdminAuth(handlers.HandleAdminCreateOrganizer)).Methods("POST")
 
+
 	//для абитуриента
 	router.HandleFunc("/api/events", middleware.UserAuth(handlers.HandleGetEvents)).Methods("GET")
 	router.HandleFunc("/api/events/{id}", middleware.UserAuth(handlers.HandleGetEventByID)).Methods("GET")
@@ -67,6 +68,8 @@ func main() {
 	router.HandleFunc("/api/user/registrations/archived", middleware.UserAuth(handlers.HandleGetArchivedRegistrations)).Methods("GET")
 	//добавление отзыва
 	router.HandleFunc("/api/events/{id}/review", middleware.UserAuth(handlers.HandleAddReview)).Methods("POST")
+
+
 
 	//для организатора
 	router.HandleFunc("/api/events", middleware.OrganizerAuth(handlers.HandleCreateEvent)).Methods("POST")
