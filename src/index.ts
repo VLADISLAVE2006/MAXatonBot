@@ -1,4 +1,5 @@
 import { Bot } from "@maxhub/max-bot-api";
+import http from "node:http";
 import "dotenv/config";
 import { env } from "@/env";
 import { initFlows } from "@/flows";
@@ -6,6 +7,7 @@ import { api } from "@/api";
 import { AppContext, getSession, setSession, setRole, setToken, setFullName, setStep, setFlow } from "@/context";
 import { initCommands } from "@/commands";
 import { initReminders } from "@/reminders";
+import { handleWebhook } from "@/webhook";
 
 const bot = new Bot<AppContext>(env.BOT_TOKEN!, { contextType: AppContext });
 
@@ -44,5 +46,29 @@ bot.use(async (ctx, next) => {
 initCommands(bot);
 initFlows(bot);
 initReminders(bot);
+
+const webhookHandler = handleWebhook(bot);
+const webhookPort = Number(process.env.WEBHOOK_PORT) || 8081;
+http.createServer(async (req, res) => {
+    if (req.url === "/webhook" && req.method === "POST") {
+        let body = "";
+        req.on("data", (chunk) => { body += chunk.toString(); });
+        req.on("end", async () => {
+            const request = new Request("http://localhost/webhook", {
+                method: "POST",
+                headers: req.headers as HeadersInit,
+                body,
+            });
+            const response = await webhookHandler(request);
+            res.writeHead(response.status, Object.fromEntries(response.headers));
+            res.end(await response.text());
+        });
+    } else {
+        res.writeHead(404);
+        res.end("Not found");
+    }
+}).listen(webhookPort, () => {
+    console.log(`Webhook server listening on port ${webhookPort}`);
+});
 
 bot.start();
