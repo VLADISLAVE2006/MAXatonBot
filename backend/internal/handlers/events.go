@@ -1501,11 +1501,12 @@ func saveUploadedFile(file io.Reader, filename string, folder string) (string, e
 // parseFlexDate парсит дату из нескольких форматов в московском времени (UTC+3)
 func parseFlexDate(s string) (time.Time, error) {
 	msk := time.FixedZone("MSK", 3*60*60)
-	t, err := time.ParseInLocation("02.01.2006 15:04", s, msk)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("unrecognized date format: %q, expected DD.MM.YYYY HH:MM", s)
+	for _, layout := range []string{"02.01.2006 15:04", "2006-01-02 15:04"} {
+		if t, err := time.ParseInLocation(layout, s, msk); err == nil {
+			return t, nil
+		}
 	}
-	return t, nil
+	return time.Time{}, fmt.Errorf("unrecognized date format: %q, expected DD.MM.YYYY HH:MM", s)
 }
 
 // удаляет файл по пути
