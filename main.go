@@ -63,6 +63,8 @@ func main() {
 	//отправка уведомлений
 	router.HandleFunc("/api/reminders/pending", middleware.APIAuth(handlers.HandleGetPendingReminders)).Methods("GET")
 	router.HandleFunc("/api/reminders/mark-sent", middleware.APIAuth(handlers.HandleMarkRemindersSent)).Methods("POST")
+	//внутренний эндпоинт для бота (получить записавшихся для рассылки)
+	router.HandleFunc("/api/events/{id}/registrations", middleware.APIAuth(handlers.HandleGetEventRegistrations)).Methods("GET")
 	//подтверждение записи
 	router.HandleFunc("/api/events/{id}/attendance", middleware.UserAuth(handlers.HandleMarkAttendance)).Methods("POST")
 	//вывод архива

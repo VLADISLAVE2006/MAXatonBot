@@ -432,6 +432,37 @@ type MarkSentRequest struct {
 	RegistrationIDs []int `json:"registration_ids"`
 }
 
+// HandleGetEventRegistrations возвращает user_id всех записавшихся на мероприятие (внутренний эндпоинт для бота)
+func HandleGetEventRegistrations(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid event id")
+		return
+	}
+
+	rows, err := db.DB.Query(
+		`SELECT user_id FROM registrations WHERE event_id = $1`, id,
+	)
+	if err != nil {
+		log.Printf("HandleGetEventRegistrations DB error: %v", err)
+		writeError(w, http.StatusInternalServerError, "database error")
+		return
+	}
+	defer rows.Close()
+
+	userIDs := []int64{}
+	for rows.Next() {
+		var uid int64
+		if err := rows.Scan(&uid); err != nil {
+			continue
+		}
+		userIDs = append(userIDs, uid)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(userIDs)
+}
+
 // HandleMarkRemindersSent отмечает напоминания как отправленные
 func HandleMarkRemindersSent(w http.ResponseWriter, r *http.Request) {
 	var req MarkSentRequest
