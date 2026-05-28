@@ -19,6 +19,19 @@ import (
 	"github.com/gorilla/mux"
 )
 
+
+type OldEventData struct {
+    Title             string
+    Description       string
+    Content           string
+    MaxSlots          *int
+    CancellationRules *string
+    Date              int64
+    Format            string
+    Type              string
+    ImageURL          string
+}
+
 type Registration struct {
 	ID           int    `json:"id"`
 	EventID      int    `json:"event_id"`
@@ -816,21 +829,32 @@ func HandleUpdateEvent(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Проверяем, что мероприятие существует, принадлежит пользователю и не закрыто
-    var createdBy int64
+    // Получаем старые данные мероприятия ДО обновления
+    var oldEvent OldEventData
     var oldImageURL string
     var closed bool
-    err = db.DB.QueryRow("SELECT created_by, image_url, closed FROM events WHERE id = $1", id).Scan(&createdBy, &oldImageURL, &closed)
+    err = db.DB.QueryRow(`
+        SELECT title, description, content, max_slots, cancellation_rules,
+               EXTRACT(epoch FROM date)::bigint, format, type, image_url, closed, created_by
+        FROM events WHERE id = $1
+    `, id).Scan(
+        &oldEvent.Title, &oldEvent.Description, &oldEvent.Content,
+        &oldEvent.MaxSlots, &oldEvent.CancellationRules,
+        &oldEvent.Date, &oldEvent.Format, &oldEvent.Type,
+        &oldImageURL, &closed, &oldEvent.CreatedBy,
+    )
     if err == sql.ErrNoRows {
         writeError(w, http.StatusNotFound, "event not found")
         return
     }
     if err != nil {
-        log.Printf("HandleUpdateEvent check error: %v", err)
+        log.Printf("HandleUpdateEvent fetch old data error: %v", err)
         writeError(w, http.StatusInternalServerError, "database error")
         return
     }
-    if createdBy != userID {
+
+    // Проверяем права
+    if oldEvent.CreatedBy != userID {
         writeError(w, http.StatusForbidden, "you can only edit your own events")
         return
     }
@@ -864,7 +888,6 @@ func HandleUpdateEvent(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // === НОВАЯ ПРОВЕРКА: новая дата должна быть в будущем ===
     if date <= time.Now().Unix() {
         writeError(w, http.StatusBadRequest, "event date must be in the future")
         return
@@ -928,6 +951,67 @@ func HandleUpdateEvent(w http.ResponseWriter, r *http.Request) {
         }
         writeError(w, http.StatusInternalServerError, "failed to update event")
         return
+    }
+
+    // СРАВНИВАЕМ СТАРЫЕ И НОВЫЕ ДАННЫЕ ДЛЯ WEBHOOK
+    changedFields := []string{}
+    oldData := make(map[string]interface{})
+    newData := make(map[string]interface{})
+
+    if oldEvent.Title != title {
+        changedFields = append(changedFields, "title")
+        oldData["title"] = oldEvent.Title
+        newData["title"] = title
+    }
+    if oldEvent.Description != description {
+        changedFields = append(changedFields, "description")
+        oldData["description"] = oldEvent.Description
+        newData["description"] = description
+    }
+    if oldEvent.Content != content {
+        changedFields = append(changedFields, "content")
+        oldData["content"] = oldEvent.Content
+        newData["content"] = content
+    }
+    if oldEvent.Date != date {
+        changedFields = append(changedFields, "date")
+        oldData["date"] = oldEvent.Date
+        newData["date"] = date
+    }
+    if oldEvent.Format != format {
+        changedFields = append(changedFields, "format")
+        oldData["format"] = oldEvent.Format
+        newData["format"] = format
+    }
+    if oldEvent.Type != eventType {
+        changedFields = append(changedFields, "type")
+        oldData["type"] = oldEvent.Type
+        newData["type"] = eventType
+    }
+
+    oldMaxSlots := 0
+    if oldEvent.MaxSlots != nil {
+        oldMaxSlots = *oldEvent.MaxSlots
+    }
+    newMaxSlots := 0
+    if maxSlots != nil {
+        newMaxSlots = *maxSlots
+    }
+    if oldMaxSlots != newMaxSlots {
+        changedFields = append(changedFields, "max_slots")
+        oldData["max_slots"] = oldMaxSlots
+        newData["max_slots"] = newMaxSlots
+    }
+
+    if oldImageURL != newImageURL {
+        changedFields = append(changedFields, "image_url")
+        oldData["image_url"] = oldImageURL
+        newData["image_url"] = newImageURL
+    }
+
+    // Если есть изменения, отправляем webhook
+    if len(changedFields) > 0 {
+        go SendWebhookNotification(id, changedFields, oldData, newData)
     }
 
     w.Header().Set("Content-Type", "application/json")
