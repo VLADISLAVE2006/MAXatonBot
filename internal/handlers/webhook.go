@@ -15,7 +15,6 @@ type EventChangePayload struct {
 	NewData       map[string]interface{} `json:"new_data"`
 }
 
-// SendWebhookNotification отправляет уведомление об изменении мероприятия в бот
 func SendWebhookNotification(eventID int, changedFields []string, oldData, newData map[string]interface{}) {
 	webhookURL := os.Getenv("BOT_WEBHOOK_URL")
 	if webhookURL == "" {

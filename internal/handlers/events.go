@@ -19,6 +19,27 @@ import (
 	"github.com/gorilla/mux"
 )
 
+type OldEventData struct {
+    Title             string
+    Description       string
+    Content           string
+    MaxSlots          *int
+    CancellationRules *string
+    Date              int64
+    Format            string
+    Type              string
+    ImageURL          string
+    CreatedBy         int64
+}
+
+type PendingReminder struct {
+    RegistrationID int    `json:"registration_id"`
+    UserID         int64  `json:"user_id"`
+    EventID        int    `json:"event_id"`
+    EventTitle     string `json:"event_title"`
+    EventDate      int64  `json:"event_date"`
+    ReminderType   string `json:"reminder_type"`
+}
 
 type OldEventData struct {
     Title             string
@@ -30,6 +51,7 @@ type OldEventData struct {
     Format            string
     Type              string
     ImageURL          string
+    CreatedBy         int64
 }
 
 type Registration struct {
@@ -82,6 +104,54 @@ type CreateEventRequest struct {
 	Date              int64   `json:"date"`   // unix timestamp
 	Format            string  `json:"format"` // "online" или "offline"
 	Type              string  `json:"type"`
+}
+
+func HandleGetPendingReminders(w http.ResponseWriter, r *http.Request) {
+    rows, err := db.DB.Query(`
+        SELECT 
+            r.id, 
+            r.user_id, 
+            e.id, 
+            e.title, 
+            EXTRACT(epoch FROM e.date)::bigint,
+            CASE
+                WHEN EXTRACT(epoch FROM e.date) - EXTRACT(epoch FROM NOW()) <= 3600 
+                     AND EXTRACT(epoch FROM e.date) - EXTRACT(epoch FROM NOW()) > 0
+                THEN 'hour_before'
+                WHEN EXTRACT(epoch FROM e.date) - EXTRACT(epoch FROM NOW()) <= 86400 
+                     AND EXTRACT(epoch FROM e.date) - EXTRACT(epoch FROM NOW()) > 82800
+                THEN 'day_before'
+                ELSE NULL
+            END AS reminder_type
+        FROM registrations r
+        JOIN events e ON r.event_id = e.id
+        JOIN users u ON r.user_id = u.user_id
+        WHERE e.date > NOW()
+          AND e.date <= NOW() + INTERVAL '36 hours'
+          AND r.reminder_sent = false
+          AND COALESCE(u.notifications_enabled, true) = true
+    `)
+    if err != nil {
+        log.Printf("GetPendingReminders DB error: %v", err)
+        writeError(w, http.StatusInternalServerError, "database error")
+        return
+    }
+    defer rows.Close()
+
+    reminders := []PendingReminder{}
+    for rows.Next() {
+        var r PendingReminder
+        if err := rows.Scan(&r.RegistrationID, &r.UserID, &r.EventID, &r.EventTitle, &r.EventDate, &r.ReminderType); err != nil {
+            log.Printf("scan error: %v", err)
+            continue
+        }
+        if r.ReminderType == "day_before" || r.ReminderType == "hour_before" {
+            reminders = append(reminders, r)
+        }
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(reminders)
 }
 
 // Для абитуриента
