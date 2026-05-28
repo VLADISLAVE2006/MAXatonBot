@@ -18,6 +18,7 @@ const resolveImageUrl = (raw) => {
 
 const EventModal = ({ event, onClose }) => {
   const handleRegister = () => {
+    if (isRegistrationClosed()) return;
     window.location.href = `https://max.ru/${import.meta.env.VITE_BOT_USERNAME}?start=register_${event.id}`;
   };
 
@@ -36,12 +37,42 @@ const EventModal = ({ event, onClose }) => {
     });
   };
 
-
   const totalSeats = event.totalSeats || event.max_slots;
   const remainingSeats = event.remainingSeats !== undefined ? event.remainingSeats :
     (event.max_slots && event.registered_count !== undefined ? event.max_slots - event.registered_count : null);
 
   const imageUrl = resolveImageUrl(event.image_url || event.imageUrl);
+
+  // Проверки для кнопки регистрации
+  const isFull = () => {
+    if (remainingSeats === null) return false;
+    return remainingSeats <= 0;
+  };
+
+  const isEventStarted = () => {
+    if (!event.dateTime) return false;
+    const eventDate = new Date(event.dateTime);
+    const now = new Date();
+    return eventDate < now;
+  };
+
+  const isRegistrationClosed = () => {
+    return isFull() || isEventStarted() || event.closed;
+  };
+
+  const getButtonText = () => {
+    if (isFull()) return "❌ Мест нет";
+    if (isEventStarted()) return "⏰ Мероприятие началось";
+    if (event.closed) return "🔒 Запись закрыта";
+    return "✏️ Записаться на мероприятие";
+  };
+
+  const getButtonIcon = () => {
+    if (isFull()) return "lucide:alert-circle";
+    if (isEventStarted()) return "lucide:clock";
+    if (event.closed) return "lucide:lock";
+    return "lucide:pencil";
+  };
 
   const styles = {
     modalOverlay: {
@@ -174,6 +205,22 @@ const EventModal = ({ event, onClose }) => {
       transition: "all 0.2s",
       marginTop: "4px",
     },
+    registerBtnDisabled: {
+      background: "var(--btn-disabled, #cccccc)",
+      border: "none",
+      color: "var(--text-disabled, #666666)",
+      padding: "12px 20px",
+      borderRadius: "50px",
+      fontSize: "0.95rem",
+      fontWeight: 600,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "10px",
+      cursor: "not-allowed",
+      opacity: 0.6,
+      marginTop: "4px",
+    },
   };
 
   const getSeatStyle = () => {
@@ -183,10 +230,9 @@ const EventModal = ({ event, onClose }) => {
     return styles.normalSeats;
   };
 
-
   const getSeatText = () => {
     if (remainingSeats === null) return "∞ (безлимит)";
-    if (remainingSeats <= 0) return "Мест нет";
+    if (remainingSeats <= 0) return "❌ Мест нет";
     return `Свободно: ${remainingSeats} из ${totalSeats}`;
   };
 
@@ -248,9 +294,15 @@ const EventModal = ({ event, onClose }) => {
               </div>
             </div>
 
-            <button style={styles.registerBtn} onClick={handleRegister}>
-              <Icon icon="lucide:pencil" width={16} height={16} /> Записаться на мероприятие
-            </button>
+            {isRegistrationClosed() ? (
+              <button style={styles.registerBtnDisabled} disabled>
+                <Icon icon={getButtonIcon()} width={16} height={16} /> {getButtonText()}
+              </button>
+            ) : (
+              <button style={styles.registerBtn} onClick={handleRegister}>
+                <Icon icon="lucide:pencil" width={16} height={16} /> Записаться на мероприятие
+              </button>
+            )}
           </div>
         </div>
       </div>
