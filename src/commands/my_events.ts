@@ -169,7 +169,7 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
                       ...(isPast && event.closed
                           ? [[Keyboard.button.callback("✍️ Оставить отзыв", `review:${event.id}`)]]
                           : []),
-                      ...(!isPast ? [[Keyboard.button.callback("❌ Отменить запись", `cancel:${event.id}`)]] : []),
+                      ...(!isPast && event.is_registered ? [[Keyboard.button.callback("❌ Отменить запись", `cancel:${event.id}`)]] : []),
                       [backButton],
                   ]
                 : [
