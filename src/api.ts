@@ -48,16 +48,6 @@ export const api = {
             }>(`/api/user/me?user_id=${userId}`, {
                 method: "GET",
             }),
-        getNotificationsEnabled: async (userId: number): Promise<boolean> => {
-            try {
-                const response = await _fetch<{ enabled: boolean }>(`/api/user/notifications?user_id=${userId}`, {
-                    method: "GET",
-                });
-                return response.enabled;
-            } catch {
-                return true; // по умолчанию включены
-            }
-        },
     },
     notifications: {
         get: (token: string) =>

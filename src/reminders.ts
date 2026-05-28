@@ -42,11 +42,6 @@ async function sendReminders(bot: Bot<AppContext>, reminderType: "day_before" | 
                 : `сегодня в ${formatDate(reminder.event_date)}`;
 
         try {
-            const notificationsEnabled = await api.user.getNotificationsEnabled(reminder.user_id);
-            if (!notificationsEnabled) {
-                continue;
-            }
-
             await bot.api.sendMessageToUser(
                 reminder.user_id,
                 `🔔 Напоминание\n\n📌 ${reminder.event_title}\nСостоится ${timeLeftMessage}\n\nОткройте бота, чтобы посмотреть детали.`,

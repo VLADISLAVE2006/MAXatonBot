@@ -5,6 +5,7 @@ import { env } from "@/env";
 
 interface EventChangePayload {
     event_id: number;
+    event_title: string;
     changed_fields: string[];
     old_data: Record<string, unknown>;
     new_data: Record<string, unknown>;
@@ -13,8 +14,8 @@ interface EventChangePayload {
 async function notifyRegisteredUsers(
     bot: Bot<AppContext>,
     eventId: number,
+    eventTitle: string,
     changedFields: string[],
-    oldData: Record<string, unknown>,
     newData: Record<string, unknown>
 ) {
     try {
@@ -49,8 +50,6 @@ async function notifyRegisteredUsers(
             })
             .join("\n");
 
-        const eventTitle = (newData.title as string) || (oldData.title as string) || "Мероприятие";
-
         const message =
             `📢 Мероприятие, на которое вы записаны, обновилось!\n\n` +
             `📌 ${eventTitle}\n\n` +
@@ -64,11 +63,6 @@ async function notifyRegisteredUsers(
         let sentCount = 0;
         for (const userId of userIds) {
             try {
-                const notificationsEnabled = await api.user.getNotificationsEnabled(userId);
-                if (!notificationsEnabled) {
-                    continue;
-                }
-
                 await bot.api.sendMessageToUser(userId, message, { attachments: [keyboard] });
                 sentCount++;
             } catch (error) {
@@ -103,8 +97,8 @@ export function handleWebhook(bot: Bot<AppContext>) {
             await notifyRegisteredUsers(
                 bot,
                 payload.event_id,
+                payload.event_title,
                 payload.changed_fields,
-                payload.old_data,
                 payload.new_data
             );
             
