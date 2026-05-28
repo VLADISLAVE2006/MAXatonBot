@@ -10,25 +10,48 @@ import (
 	"strings"
 )
 
-// HandleGetCurrentAgreement – получение текущего активного соглашения
+// AgreementResponse ответ с информацией о соглашении
+type AgreementResponse struct {
+	Version string `json:"version"`
+	FileURL string `json:"file_url"`
+}
+
+// HandleGetCurrentAgreement возвращает текущее активное соглашение об обработке ПД
+//
+//	@Summary		Текущее соглашение об обработке ПД
+//	@Tags			agreement
+//	@Produce		json
+//	@Success		200	{object}	AgreementResponse
+//	@Failure		404	{object}	errorResponse
+//	@Router			/api/agreement/current [get]
 func HandleGetCurrentAgreement(w http.ResponseWriter, r *http.Request) {
 	var version, filePath string
 	err := db.DB.QueryRow("SELECT version, file_path FROM agreements WHERE is_active = true LIMIT 1").Scan(&version, &filePath)
 	if err != nil {
-		// Если нет активного, возвращаем 404, но обычно есть дефолтное
 		writeError(w, http.StatusNotFound, "no active agreement")
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"version":  version,
-		"file_url": filePath,
-	})
+	json.NewEncoder(w).Encode(AgreementResponse{Version: version, FileURL: filePath})
 }
 
-// HandleUploadAgreement – загрузка новой версии (только для админа)
+// HandleUploadAgreement загружает новую версию соглашения (только для admin)
+//
+//	@Summary		Загрузить соглашение об обработке ПД
+//	@Tags			agreement
+//	@Accept			multipart/form-data
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Security		BearerAuth
+//	@Param			file	formData	file	true	"PDF-файл"
+//	@Param			version	formData	string	true	"Версия соглашения, например 1.1"
+//	@Success		200		{object}	StatusResponse
+//	@Failure		400		{object}	errorResponse
+//	@Failure		401		{object}	errorResponse
+//	@Failure		403		{object}	errorResponse
+//	@Failure		500		{object}	errorResponse
+//	@Router			/api/admin/agreement [post]
 func HandleUploadAgreement(w http.ResponseWriter, r *http.Request) {
-
 	err := r.ParseMultipartForm(10 << 20) // 10 MB
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "form too large")
@@ -63,14 +86,12 @@ func HandleUploadAgreement(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Создаём папку
 	dir := "uploads/agreements"
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		writeError(w, http.StatusInternalServerError, "cannot create directory")
 		return
 	}
 
-	// Генерируем имя файла на основе версии
 	filename := "agreement_" + version + ".pdf"
 	filePath := filepath.Join(dir, filename)
 	dst, err := os.Create(filePath)
@@ -84,7 +105,6 @@ func HandleUploadAgreement(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Начинаем транзакцию: деактивируем старую активную запись, вставляем новую
 	tx, err := db.DB.Begin()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "database error")
@@ -109,5 +129,5 @@ func HandleUploadAgreement(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "agreement uploaded", "version": version})
+	json.NewEncoder(w).Encode(StatusResponse{Status: "agreement uploaded"})
 }

@@ -96,6 +96,16 @@ type CreateEventRequest struct {
 	Type              string  `json:"type"`
 }
 
+// HandleGetPendingReminders возвращает напоминания, которые нужно отправить
+//
+//	@Summary		Получить pending-напоминания
+//	@Tags			reminders
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Success		200	{array}		PendingReminder
+//	@Failure		401	{object}	errorResponse
+//	@Failure		500	{object}	errorResponse
+//	@Router			/api/reminders/pending [get]
 func HandleGetPendingReminders(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.DB.Query(`
         SELECT 
@@ -150,8 +160,17 @@ func HandleGetPendingReminders(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(reminders)
 }
 
-// Для абитуриента
-// HandleGetEvents возвращает список мероприятий в кратком виде
+// HandleGetEvents возвращает список предстоящих открытых мероприятий
+//
+//	@Summary		Список мероприятий
+//	@Tags			events
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Security		BearerAuth
+//	@Success		200	{array}		ShortEvent
+//	@Failure		401	{object}	errorResponse
+//	@Failure		500	{object}	errorResponse
+//	@Router			/api/events [get]
 func HandleGetEvents(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.DB.Query(`
         SELECT
@@ -188,6 +207,19 @@ func HandleGetEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleGetEventByID возвращает полную информацию о мероприятии
+//
+//	@Summary		Мероприятие по ID
+//	@Tags			events
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Security		BearerAuth
+//	@Param			id	path		int	true	"ID мероприятия"
+//	@Success		200	{object}	Event
+//	@Failure		400	{object}	errorResponse
+//	@Failure		401	{object}	errorResponse
+//	@Failure		404	{object}	errorResponse
+//	@Failure		500	{object}	errorResponse
+//	@Router			/api/events/{id} [get]
 func HandleGetEventByID(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r)
 	userID := claims.UserID
@@ -242,6 +274,21 @@ func HandleGetEventByID(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleRegisterEvent записывает текущего пользователя на мероприятие
+//
+//	@Summary		Записаться на мероприятие
+//	@Tags			events
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Security		BearerAuth
+//	@Param			id	path		int	true	"ID мероприятия"
+//	@Success		201	{object}	RegisterEventResponse
+//	@Failure		400	{object}	errorResponse
+//	@Failure		401	{object}	errorResponse
+//	@Failure		403	{object}	errorResponse
+//	@Failure		404	{object}	errorResponse
+//	@Failure		409	{object}	errorResponse
+//	@Failure		500	{object}	errorResponse
+//	@Router			/api/events/{id}/register [post]
 func HandleRegisterEvent(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r)
 	userID := claims.UserID
@@ -339,6 +386,20 @@ func HandleRegisterEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleCancelEvent отменяет запись пользователя на мероприятие
+//
+//	@Summary		Отменить запись на мероприятие
+//	@Tags			events
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Security		BearerAuth
+//	@Param			id	path		int	true	"ID мероприятия"
+//	@Success		200	{object}	StatusResponse
+//	@Failure		400	{object}	errorResponse
+//	@Failure		401	{object}	errorResponse
+//	@Failure		403	{object}	errorResponse
+//	@Failure		404	{object}	errorResponse
+//	@Failure		500	{object}	errorResponse
+//	@Router			/api/events/{id}/register [delete]
 func HandleCancelEvent(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r)
 	userID := claims.UserID
@@ -401,7 +462,17 @@ func HandleCancelEvent(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "registration cancelled"})
 }
 
-// HandleMyRegistrations возвращает список мероприятий, на которые записан пользователь
+// HandleMyRegistrations возвращает активные записи пользователя
+//
+//	@Summary		Мои записи на мероприятия
+//	@Tags			events
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Security		BearerAuth
+//	@Success		200	{array}		Registration
+//	@Failure		401	{object}	errorResponse
+//	@Failure		500	{object}	errorResponse
+//	@Router			/api/user/registrations [get]
 func HandleMyRegistrations(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r)
 	userID := claims.UserID
@@ -438,7 +509,18 @@ type MarkSentRequest struct {
 	RegistrationIDs []int `json:"registration_ids"`
 }
 
-// HandleGetEventRegistrations возвращает user_id записавшихся с включёнными уведомлениями (внутренний эндпоинт для бота)
+// HandleGetEventRegistrations возвращает user_id участников с включёнными уведомлениями (внутренний эндпоинт для бота)
+//
+//	@Summary		User ID участников мероприятия (внутренний)
+//	@Tags			reminders
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Param			id	path		int		true	"ID мероприятия"
+//	@Success		200	{array}		integer
+//	@Failure		400	{object}	errorResponse
+//	@Failure		401	{object}	errorResponse
+//	@Failure		500	{object}	errorResponse
+//	@Router			/api/events/{id}/registrations [get]
 func HandleGetEventRegistrations(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(mux.Vars(r)["id"])
 	if err != nil {
@@ -472,6 +554,18 @@ func HandleGetEventRegistrations(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleMarkRemindersSent отмечает напоминания как отправленные
+//
+//	@Summary		Пометить напоминания отправленными
+//	@Tags			reminders
+//	@Accept			json
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Param			body	body		MarkSentRequest	true	"Список ID регистраций"
+//	@Success		200		{object}	StatusResponse
+//	@Failure		400		{object}	errorResponse
+//	@Failure		401		{object}	errorResponse
+//	@Failure		500		{object}	errorResponse
+//	@Router			/api/reminders/mark-sent [post]
 func HandleMarkRemindersSent(w http.ResponseWriter, r *http.Request) {
 	var req MarkSentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -500,7 +594,23 @@ type MarkAttendanceRequest struct {
 	Code string `json:"code"`
 }
 
-// HandleMarkAttendance подтверждает посещение мероприятия по коду записи
+// HandleMarkAttendance подтверждает посещение мероприятия по QR-коду
+//
+//	@Summary		Отметить посещение
+//	@Tags			events
+//	@Accept			json
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Security		BearerAuth
+//	@Param			id		path		int						true	"ID мероприятия"
+//	@Param			body	body		MarkAttendanceRequest	true	"Код из QR"
+//	@Success		200		{object}	StatusResponse
+//	@Failure		400		{object}	errorResponse
+//	@Failure		401		{object}	errorResponse
+//	@Failure		404		{object}	errorResponse
+//	@Failure		409		{object}	errorResponse
+//	@Failure		500		{object}	errorResponse
+//	@Router			/api/events/{id}/attendance [post]
 func HandleMarkAttendance(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r)
 	userID := claims.UserID
@@ -572,6 +682,24 @@ type ReviewRequest struct {
 	Comment string `json:"comment,omitempty"`
 }
 
+// HandleAddReview оставляет отзыв на закрытое мероприятие
+//
+//	@Summary		Оставить отзыв
+//	@Tags			events
+//	@Accept			json
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Security		BearerAuth
+//	@Param			id		path		int				true	"ID мероприятия"
+//	@Param			body	body		ReviewRequest	true	"Отзыв"
+//	@Success		201		{object}	StatusResponse
+//	@Failure		400		{object}	errorResponse
+//	@Failure		401		{object}	errorResponse
+//	@Failure		403		{object}	errorResponse
+//	@Failure		404		{object}	errorResponse
+//	@Failure		409		{object}	errorResponse
+//	@Failure		500		{object}	errorResponse
+//	@Router			/api/events/{id}/review [post]
 func HandleAddReview(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r)
 	userID := claims.UserID
@@ -655,7 +783,47 @@ func generateRegistrationCode() string {
 	return string(b)
 }
 
-// HandleGetArchivedRegistrations возвращает список закрытых мероприятий, на которые был записан пользователь
+type ArchivedRegistration struct {
+	EventID      int    `json:"event_id"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	Date         int64  `json:"date"`
+	Format       string `json:"format"`
+	Type         string `json:"type"`
+	MaxSlots     *int   `json:"max_slots"`
+	Code         string `json:"code"`
+	Attended     bool   `json:"attended"`
+	RegisteredAt int64  `json:"registered_at"`
+	ImageURL     string `json:"image_url"`
+}
+
+type Attendee struct {
+	UserID       int64  `json:"user_id"`
+	FullName     string `json:"full_name"`
+	RegisteredAt int64  `json:"registered_at"`
+	Attended     bool   `json:"attended"`
+}
+
+type RegisterEventResponse struct {
+	Status       string `json:"status"`
+	Code         string `json:"code"`
+	EventID      int    `json:"event_id"`
+	EventTitle   string `json:"event_title"`
+	EventDate    int64  `json:"event_date"`
+	RegisteredAt int64  `json:"registered_at"`
+}
+
+// HandleGetArchivedRegistrations возвращает архив мероприятий пользователя
+//
+//	@Summary		Архив записей пользователя
+//	@Tags			events
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Security		BearerAuth
+//	@Success		200	{array}		ArchivedRegistration
+//	@Failure		401	{object}	errorResponse
+//	@Failure		500	{object}	errorResponse
+//	@Router			/api/user/registrations/archived [get]
 func HandleGetArchivedRegistrations(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r)
 	userID := claims.UserID
@@ -680,20 +848,6 @@ func HandleGetArchivedRegistrations(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	type ArchivedRegistration struct {
-		EventID      int    `json:"event_id"`
-		Title        string `json:"title"`
-		Description  string `json:"description"`
-		Date         int64  `json:"date"`
-		Format       string `json:"format"`
-		Type         string `json:"type"`
-		MaxSlots     *int   `json:"max_slots"`
-		Code         string `json:"code"`
-		Attended     bool   `json:"attended"`
-		RegisteredAt int64  `json:"registered_at"`
-		ImageURL     string `json:"image_url"`
-	}
-
 	archived := []ArchivedRegistration{}
 	for rows.Next() {
 		var a ArchivedRegistration
@@ -708,8 +862,29 @@ func HandleGetArchivedRegistrations(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(archived)
 }
 
-// для организатора
 // HandleCreateEvent создаёт новое мероприятие (только для организатора)
+//
+//	@Summary		Создать мероприятие
+//	@Tags			organizer
+//	@Accept			multipart/form-data
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Security		BearerAuth
+//	@Param			title				formData	string	true	"Название"
+//	@Param			description			formData	string	true	"Краткое описание"
+//	@Param			content				formData	string	true	"Полный текст"
+//	@Param			date				formData	integer	true	"Дата (unix timestamp)"
+//	@Param			format				formData	string	true	"Формат: online / offline"
+//	@Param			type				formData	string	true	"Тип: hackathon / olympiad / conference / openday"
+//	@Param			max_slots			formData	integer	false	"Лимит мест (0 = без лимита)"
+//	@Param			cancellation_rules	formData	string	false	"Правила отмены"
+//	@Param			image				formData	file	false	"Изображение"
+//	@Success		201					{object}	Event
+//	@Failure		400					{object}	errorResponse
+//	@Failure		401					{object}	errorResponse
+//	@Failure		403					{object}	errorResponse
+//	@Failure		500					{object}	errorResponse
+//	@Router			/api/events [post]
 func HandleCreateEvent(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r)
 	userID := claims.UserID
@@ -816,7 +991,21 @@ type UploadEventsResponse struct {
 	Errors  map[int]string `json:"errors,omitempty"` // строка -> сообщение об ошибке
 }
 
-// HandleUploadEventsCSV – массовое создание мероприятий из CSV
+// HandleUploadEventsCSV массово создаёт мероприятия из CSV-файла
+//
+//	@Summary		Загрузить мероприятия из CSV
+//	@Tags			organizer
+//	@Accept			multipart/form-data
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Security		BearerAuth
+//	@Param			file	formData	file	true	"CSV-файл (разделитель , или ;)"
+//	@Success		200		{object}	UploadEventsResponse
+//	@Failure		400		{object}	errorResponse
+//	@Failure		401		{object}	errorResponse
+//	@Failure		403		{object}	errorResponse
+//	@Failure		500		{object}	errorResponse
+//	@Router			/api/events/upload [post]
 func HandleUploadEventsCSV(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r)
 	userID := claims.UserID
@@ -1002,7 +1191,18 @@ func HandleUploadEventsCSV(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// HandleGetOrganizerEvents возвращает список мероприятий, созданных текущим организатором
+// HandleGetOrganizerEvents возвращает список активных мероприятий организатора
+//
+//	@Summary		Мои мероприятия (организатор)
+//	@Tags			organizer
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Security		BearerAuth
+//	@Success		200	{array}		ShortEvent
+//	@Failure		401	{object}	errorResponse
+//	@Failure		403	{object}	errorResponse
+//	@Failure		500	{object}	errorResponse
+//	@Router			/api/organizer/events [get]
 func HandleGetOrganizerEvents(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r)
 	userID := claims.UserID
@@ -1039,7 +1239,31 @@ func HandleGetOrganizerEvents(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(events)
 }
 
-// HandleUpdateEvent обновляет существующее мероприятие (только для создателя)
+// HandleUpdateEvent обновляет мероприятие (только для создателя)
+//
+//	@Summary		Обновить мероприятие
+//	@Tags			organizer
+//	@Accept			multipart/form-data
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Security		BearerAuth
+//	@Param			id					path		int		true	"ID мероприятия"
+//	@Param			title				formData	string	true	"Название"
+//	@Param			description			formData	string	true	"Краткое описание"
+//	@Param			content				formData	string	true	"Полный текст"
+//	@Param			date				formData	integer	true	"Дата (unix timestamp)"
+//	@Param			format				formData	string	true	"Формат: online / offline"
+//	@Param			type				formData	string	true	"Тип: hackathon / olympiad / conference / openday"
+//	@Param			max_slots			formData	integer	false	"Лимит мест"
+//	@Param			cancellation_rules	formData	string	false	"Правила отмены"
+//	@Param			image				formData	file	false	"Новое изображение"
+//	@Success		200					{object}	Event
+//	@Failure		400					{object}	errorResponse
+//	@Failure		401					{object}	errorResponse
+//	@Failure		403					{object}	errorResponse
+//	@Failure		404					{object}	errorResponse
+//	@Failure		500					{object}	errorResponse
+//	@Router			/api/events/{id} [put]
 func HandleUpdateEvent(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r)
 	userID := claims.UserID
@@ -1233,6 +1457,20 @@ func HandleUpdateEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleDeleteEvent удаляет мероприятие (только для создателя)
+//
+//	@Summary		Удалить мероприятие
+//	@Tags			organizer
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Security		BearerAuth
+//	@Param			id	path		int	true	"ID мероприятия"
+//	@Success		200	{object}	StatusResponse
+//	@Failure		400	{object}	errorResponse
+//	@Failure		401	{object}	errorResponse
+//	@Failure		403	{object}	errorResponse
+//	@Failure		404	{object}	errorResponse
+//	@Failure		500	{object}	errorResponse
+//	@Router			/api/events/{id} [delete]
 func HandleDeleteEvent(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r)
 	userID := claims.UserID
@@ -1272,6 +1510,22 @@ func HandleDeleteEvent(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "event deleted"})
 }
 
+// HandleCloseEvent закрывает регистрацию на мероприятие
+//
+//	@Summary		Закрыть мероприятие
+//	@Tags			organizer
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Security		BearerAuth
+//	@Param			id	path		int	true	"ID мероприятия"
+//	@Success		200	{object}	StatusResponse
+//	@Failure		400	{object}	errorResponse
+//	@Failure		401	{object}	errorResponse
+//	@Failure		403	{object}	errorResponse
+//	@Failure		404	{object}	errorResponse
+//	@Failure		409	{object}	errorResponse
+//	@Failure		500	{object}	errorResponse
+//	@Router			/api/events/{id}/close [post]
 func HandleCloseEvent(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r)
 	userID := claims.UserID
@@ -1319,7 +1573,18 @@ func HandleCloseEvent(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "event closed"})
 }
 
-// HandleGetOrganizerArchivedEvents возвращает список закрытых мероприятий, созданных организатором
+// HandleGetOrganizerArchivedEvents возвращает архив мероприятий организатора
+//
+//	@Summary		Архив мероприятий (организатор)
+//	@Tags			organizer
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Security		BearerAuth
+//	@Success		200	{array}		ShortEvent
+//	@Failure		401	{object}	errorResponse
+//	@Failure		403	{object}	errorResponse
+//	@Failure		500	{object}	errorResponse
+//	@Router			/api/organizer/events/archived [get]
 func HandleGetOrganizerArchivedEvents(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r)
 	userID := claims.UserID
@@ -1367,6 +1632,21 @@ type EventStats struct {
 	AverageRating   float64 `json:"average_rating"` // средний рейтинг (0 если нет отзывов)
 }
 
+// HandleEventStats возвращает статистику мероприятия
+//
+//	@Summary		Статистика мероприятия
+//	@Tags			organizer
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Security		BearerAuth
+//	@Param			id	path		int	true	"ID мероприятия"
+//	@Success		200	{object}	EventStats
+//	@Failure		400	{object}	errorResponse
+//	@Failure		401	{object}	errorResponse
+//	@Failure		403	{object}	errorResponse
+//	@Failure		404	{object}	errorResponse
+//	@Failure		500	{object}	errorResponse
+//	@Router			/api/events/{id}/stats [get]
 func HandleEventStats(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r)
 	userID := claims.UserID
@@ -1424,7 +1704,21 @@ func HandleEventStats(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(stats)
 }
 
-// возвращает список записавшихся пользователей (только для организатора)
+// HandleEventAttendees возвращает список участников мероприятия
+//
+//	@Summary		Участники мероприятия
+//	@Tags			organizer
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Security		BearerAuth
+//	@Param			id	path		int	true	"ID мероприятия"
+//	@Success		200	{array}		Attendee
+//	@Failure		400	{object}	errorResponse
+//	@Failure		401	{object}	errorResponse
+//	@Failure		403	{object}	errorResponse
+//	@Failure		404	{object}	errorResponse
+//	@Failure		500	{object}	errorResponse
+//	@Router			/api/events/{id}/attendees [get]
 func HandleEventAttendees(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r)
 	userID := claims.UserID
@@ -1460,12 +1754,6 @@ func HandleEventAttendees(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	type Attendee struct {
-		UserID       int64  `json:"user_id"`
-		FullName     string `json:"full_name"`
-		RegisteredAt int64  `json:"registered_at"`
-		Attended     bool   `json:"attended"`
-	}
 	attendees := []Attendee{}
 	for rows.Next() {
 		var a Attendee

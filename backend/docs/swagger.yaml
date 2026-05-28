@@ -1,0 +1,1338 @@
+basePath: /
+definitions:
+  handlers.AdminCreateOrganizerRequest:
+    properties:
+      full_name:
+        type: string
+      user_id:
+        type: integer
+    type: object
+  handlers.AgreementResponse:
+    properties:
+      file_url:
+        type: string
+      version:
+        type: string
+    type: object
+  handlers.ArchivedRegistration:
+    properties:
+      attended:
+        type: boolean
+      code:
+        type: string
+      date:
+        type: integer
+      description:
+        type: string
+      event_id:
+        type: integer
+      format:
+        type: string
+      image_url:
+        type: string
+      max_slots:
+        type: integer
+      registered_at:
+        type: integer
+      title:
+        type: string
+      type:
+        type: string
+    type: object
+  handlers.Attendee:
+    properties:
+      attended:
+        type: boolean
+      full_name:
+        type: string
+      registered_at:
+        type: integer
+      user_id:
+        type: integer
+    type: object
+  handlers.ConsentRequest:
+    properties:
+      agreed:
+        type: boolean
+      agreement_version:
+        type: string
+      user_id:
+        type: integer
+    type: object
+  handlers.Event:
+    properties:
+      cancellation_rules:
+        type: string
+      closed:
+        type: boolean
+      content:
+        type: string
+      created_at:
+        description: unix timestamp
+        type: integer
+      created_by:
+        type: integer
+      date:
+        description: unix timestamp
+        type: integer
+      description:
+        type: string
+      format:
+        type: string
+      id:
+        type: integer
+      image_url:
+        type: string
+      is_registered:
+        type: boolean
+      max_slots:
+        type: integer
+      registered_count:
+        type: integer
+      title:
+        type: string
+      type:
+        type: string
+      updated_at:
+        description: unix timestamp
+        type: integer
+    type: object
+  handlers.EventStats:
+    properties:
+      average_rating:
+        description: средний рейтинг (0 если нет отзывов)
+        type: number
+      percentage:
+        type: number
+      reviews_count:
+        description: сколько отзывов
+        type: integer
+      total_attended:
+        type: integer
+      total_registered:
+        type: integer
+    type: object
+  handlers.MarkAttendanceRequest:
+    properties:
+      code:
+        type: string
+    type: object
+  handlers.MarkSentRequest:
+    properties:
+      registration_ids:
+        items:
+          type: integer
+        type: array
+    type: object
+  handlers.MeResponse:
+    properties:
+      full_name:
+        type: string
+      role:
+        type: string
+      token:
+        type: string
+    type: object
+  handlers.NotificationsRequest:
+    properties:
+      enabled:
+        type: boolean
+    type: object
+  handlers.NotificationsResponse:
+    properties:
+      enabled:
+        type: boolean
+    type: object
+  handlers.PendingReminder:
+    properties:
+      event_date:
+        type: integer
+      event_id:
+        type: integer
+      event_title:
+        type: string
+      registration_id:
+        type: integer
+      reminder_type:
+        type: string
+      user_id:
+        type: integer
+    type: object
+  handlers.ProfileRequest:
+    properties:
+      full_name:
+        type: string
+    type: object
+  handlers.RegisterEventResponse:
+    properties:
+      code:
+        type: string
+      event_date:
+        type: integer
+      event_id:
+        type: integer
+      event_title:
+        type: string
+      registered_at:
+        type: integer
+      status:
+        type: string
+    type: object
+  handlers.Registration:
+    properties:
+      attended:
+        type: boolean
+      code:
+        type: string
+      event_date:
+        type: integer
+      event_id:
+        type: integer
+      event_title:
+        type: string
+      id:
+        type: integer
+      registered_at:
+        type: integer
+    type: object
+  handlers.ReviewRequest:
+    properties:
+      comment:
+        type: string
+      rating:
+        type: integer
+    type: object
+  handlers.ShortEvent:
+    properties:
+      date:
+        type: integer
+      description:
+        type: string
+      format:
+        type: string
+      id:
+        type: integer
+      image_url:
+        type: string
+      max_slots:
+        type: integer
+      registered_count:
+        type: integer
+      title:
+        type: string
+      type:
+        type: string
+    type: object
+  handlers.StatusResponse:
+    properties:
+      status:
+        type: string
+    type: object
+  handlers.UploadEventsResponse:
+    properties:
+      created:
+        type: integer
+      errors:
+        additionalProperties:
+          type: string
+        description: строка -> сообщение об ошибке
+        type: object
+    type: object
+  handlers.errorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: REST API для бота записи абитуриентов на мероприятия МИРЭА
+  title: MAXatonBot API
+  version: "1.0"
+paths:
+  /api/admin/agreement:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: PDF-файл
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: Версия соглашения, например 1.1
+        in: formData
+        name: version
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Загрузить соглашение об обработке ПД
+      tags:
+      - agreement
+  /api/admin/organizers:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Данные организатора
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.AdminCreateOrganizerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Создать организатора
+      tags:
+      - admin
+  /api/agreement/current:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.AgreementResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      summary: Текущее соглашение об обработке ПД
+      tags:
+      - agreement
+  /api/events:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.ShortEvent'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Список мероприятий
+      tags:
+      - events
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Название
+        in: formData
+        name: title
+        required: true
+        type: string
+      - description: Краткое описание
+        in: formData
+        name: description
+        required: true
+        type: string
+      - description: Полный текст
+        in: formData
+        name: content
+        required: true
+        type: string
+      - description: Дата (unix timestamp)
+        in: formData
+        name: date
+        required: true
+        type: integer
+      - description: 'Формат: online / offline'
+        in: formData
+        name: format
+        required: true
+        type: string
+      - description: 'Тип: hackathon / olympiad / conference / openday'
+        in: formData
+        name: type
+        required: true
+        type: string
+      - description: Лимит мест (0 = без лимита)
+        in: formData
+        name: max_slots
+        type: integer
+      - description: Правила отмены
+        in: formData
+        name: cancellation_rules
+        type: string
+      - description: Изображение
+        in: formData
+        name: image
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.Event'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Создать мероприятие
+      tags:
+      - organizer
+  /api/events/{id}:
+    delete:
+      parameters:
+      - description: ID мероприятия
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Удалить мероприятие
+      tags:
+      - organizer
+    get:
+      parameters:
+      - description: ID мероприятия
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.Event'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Мероприятие по ID
+      tags:
+      - events
+    put:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: ID мероприятия
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Название
+        in: formData
+        name: title
+        required: true
+        type: string
+      - description: Краткое описание
+        in: formData
+        name: description
+        required: true
+        type: string
+      - description: Полный текст
+        in: formData
+        name: content
+        required: true
+        type: string
+      - description: Дата (unix timestamp)
+        in: formData
+        name: date
+        required: true
+        type: integer
+      - description: 'Формат: online / offline'
+        in: formData
+        name: format
+        required: true
+        type: string
+      - description: 'Тип: hackathon / olympiad / conference / openday'
+        in: formData
+        name: type
+        required: true
+        type: string
+      - description: Лимит мест
+        in: formData
+        name: max_slots
+        type: integer
+      - description: Правила отмены
+        in: formData
+        name: cancellation_rules
+        type: string
+      - description: Новое изображение
+        in: formData
+        name: image
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.Event'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Обновить мероприятие
+      tags:
+      - organizer
+  /api/events/{id}/attendance:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID мероприятия
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Код из QR
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.MarkAttendanceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Отметить посещение
+      tags:
+      - events
+  /api/events/{id}/attendees:
+    get:
+      parameters:
+      - description: ID мероприятия
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.Attendee'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Участники мероприятия
+      tags:
+      - organizer
+  /api/events/{id}/close:
+    post:
+      parameters:
+      - description: ID мероприятия
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Закрыть мероприятие
+      tags:
+      - organizer
+  /api/events/{id}/register:
+    delete:
+      parameters:
+      - description: ID мероприятия
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Отменить запись на мероприятие
+      tags:
+      - events
+    post:
+      parameters:
+      - description: ID мероприятия
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.RegisterEventResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Записаться на мероприятие
+      tags:
+      - events
+  /api/events/{id}/registrations:
+    get:
+      parameters:
+      - description: ID мероприятия
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              type: integer
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: User ID участников мероприятия (внутренний)
+      tags:
+      - reminders
+  /api/events/{id}/review:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID мероприятия
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Отзыв
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.ReviewRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Оставить отзыв
+      tags:
+      - events
+  /api/events/{id}/stats:
+    get:
+      parameters:
+      - description: ID мероприятия
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.EventStats'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Статистика мероприятия
+      tags:
+      - organizer
+  /api/events/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: CSV-файл (разделитель , или ;)
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.UploadEventsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Загрузить мероприятия из CSV
+      tags:
+      - organizer
+  /api/organizer/events:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.ShortEvent'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Мои мероприятия (организатор)
+      tags:
+      - organizer
+  /api/organizer/events/archived:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.ShortEvent'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Архив мероприятий (организатор)
+      tags:
+      - organizer
+  /api/reminders/mark-sent:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Список ID регистраций
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.MarkSentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Пометить напоминания отправленными
+      tags:
+      - reminders
+  /api/reminders/pending:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.PendingReminder'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Получить pending-напоминания
+      tags:
+      - reminders
+  /api/user/consent:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Данные согласия
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.ConsentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Сохранить согласие на обработку ПД
+      tags:
+      - user
+  /api/user/me:
+    get:
+      parameters:
+      - description: ID пользователя в MAX
+        in: query
+        name: user_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Получить данные пользователя и JWT
+      tags:
+      - user
+  /api/user/notifications:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.NotificationsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Получить настройки уведомлений
+      tags:
+      - user
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Настройки уведомлений
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.NotificationsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Обновить настройки уведомлений
+      tags:
+      - user
+  /api/user/profile:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: ФИО
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.ProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Сохранить ФИО пользователя
+      tags:
+      - user
+  /api/user/registrations:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.Registration'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Мои записи на мероприятия
+      tags:
+      - events
+  /api/user/registrations/archived:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.ArchivedRegistration'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.errorResponse'
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      summary: Архив записей пользователя
+      tags:
+      - events
+securityDefinitions:
+  ApiKeyAuth:
+    description: Общий API-ключ для межсервисного взаимодействия
+    in: header
+    name: X-API-Key
+    type: apiKey
+  BearerAuth:
+    description: 'JWT-токен пользователя. Формат: Bearer <token>'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

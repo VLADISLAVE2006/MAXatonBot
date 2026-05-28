@@ -1,3 +1,19 @@
+//	@title						MAXatonBot API
+//	@version					1.0
+//	@description				REST API для бота записи абитуриентов на мероприятия МИРЭА
+//	@host						localhost:8080
+//	@BasePath					/
+//
+//	@securityDefinitions.apikey	ApiKeyAuth
+//	@in							header
+//	@name						X-API-Key
+//	@description				Общий API-ключ для межсервисного взаимодействия
+//
+//	@securityDefinitions.apikey	BearerAuth
+//	@in							header
+//	@name						Authorization
+//	@description				JWT-токен пользователя. Формат: Bearer <token>
+
 package main
 
 import (
@@ -7,7 +23,9 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 
+	_ "api/docs"
 	"api/internal/db"
 	"api/internal/handlers"
 	"api/internal/middleware"
@@ -28,77 +46,63 @@ func corsMiddleware(next http.Handler) http.Handler {
 }
 
 func main() {
-	// Загружаем .env
 	if err := godotenv.Load(); err != nil {
 		log.Println("Warning: no .env file found, relying on environment variables")
 	}
 
-	// Инициализируем базу данных
 	if err := db.InitDB(); err != nil {
 		log.Fatalf("Database initialization failed: %v", err)
 	}
-	defer db.DB.Close() // при выходе закроем соединение
+	defer db.DB.Close()
 
-	// Создаём роутер
 	router := mux.NewRouter()
 
-	// Эндпоинты с защитой API-ключом
+	// Swagger UI
+	router.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
+
+	// User
 	router.HandleFunc("/api/user/consent", middleware.APIAuth(handlers.HandleConsent)).Methods("POST")
 	router.HandleFunc("/api/user/profile", middleware.UserAuth(handlers.HandleProfile)).Methods("POST")
 	router.HandleFunc("/api/user/me", middleware.APIAuth(handlers.HandleGetMe)).Methods("GET")
+	router.HandleFunc("/api/user/registrations", middleware.UserAuth(handlers.HandleMyRegistrations)).Methods("GET")
+	router.HandleFunc("/api/user/registrations/archived", middleware.UserAuth(handlers.HandleGetArchivedRegistrations)).Methods("GET")
+	router.HandleFunc("/api/user/notifications", middleware.UserAuth(handlers.HandleGetNotifications)).Methods("GET")
+	router.HandleFunc("/api/user/notifications", middleware.UserAuth(handlers.HandleUpdateNotifications)).Methods("POST")
 
-
-	router.HandleFunc("/api/admin/organizers", middleware.AdminAuth(handlers.HandleAdminCreateOrganizer)).Methods("POST")
-	// Публичный эндпоинт для получения текущего соглашения (без авторизации, но можно с APIAuth для безопасности)
+	// Agreement
 	router.HandleFunc("/api/agreement/current", handlers.HandleGetCurrentAgreement).Methods("GET")
-
-	// Админский эндпоинт для загрузки новой версии
 	router.HandleFunc("/api/admin/agreement", middleware.AdminAuth(handlers.HandleUploadAgreement)).Methods("POST")
 
-	//для абитуриента
+	// Admin
+	router.HandleFunc("/api/admin/organizers", middleware.AdminAuth(handlers.HandleAdminCreateOrganizer)).Methods("POST")
+
+	// Events (абитуриент)
 	router.HandleFunc("/api/events", middleware.UserAuth(handlers.HandleGetEvents)).Methods("GET")
 	router.HandleFunc("/api/events/upload", middleware.OrganizerAuth(handlers.HandleUploadEventsCSV)).Methods("POST")
 	router.HandleFunc("/api/events/{id}", middleware.UserAuth(handlers.HandleGetEventByID)).Methods("GET")
-	//касаемо записи на мероприятие
 	router.HandleFunc("/api/events/{id}/register", middleware.UserAuth(handlers.HandleRegisterEvent)).Methods("POST")
 	router.HandleFunc("/api/events/{id}/register", middleware.UserAuth(handlers.HandleCancelEvent)).Methods("DELETE")
-	router.HandleFunc("/api/user/registrations", middleware.UserAuth(handlers.HandleMyRegistrations)).Methods("GET")
-	//настройка уведомлений
-	router.HandleFunc("/api/user/notifications", middleware.UserAuth(handlers.HandleGetNotifications)).Methods("GET")
-	router.HandleFunc("/api/user/notifications", middleware.UserAuth(handlers.HandleUpdateNotifications)).Methods("POST")
-	//отправка уведомлений
-	router.HandleFunc("/api/reminders/pending", middleware.APIAuth(handlers.HandleGetPendingReminders)).Methods("GET")
-	router.HandleFunc("/api/reminders/mark-sent", middleware.APIAuth(handlers.HandleMarkRemindersSent)).Methods("POST")
-	//внутренний эндпоинт для бота (получить записавшихся для рассылки)
-	router.HandleFunc("/api/events/{id}/registrations", middleware.APIAuth(handlers.HandleGetEventRegistrations)).Methods("GET")
-	//подтверждение записи
 	router.HandleFunc("/api/events/{id}/attendance", middleware.UserAuth(handlers.HandleMarkAttendance)).Methods("POST")
-	//вывод архива
-	router.HandleFunc("/api/user/registrations/archived", middleware.UserAuth(handlers.HandleGetArchivedRegistrations)).Methods("GET")
-	//добавление отзыва
 	router.HandleFunc("/api/events/{id}/review", middleware.UserAuth(handlers.HandleAddReview)).Methods("POST")
 
+	// Reminders (внутренние для бота)
+	router.HandleFunc("/api/reminders/pending", middleware.APIAuth(handlers.HandleGetPendingReminders)).Methods("GET")
+	router.HandleFunc("/api/reminders/mark-sent", middleware.APIAuth(handlers.HandleMarkRemindersSent)).Methods("POST")
+	router.HandleFunc("/api/events/{id}/registrations", middleware.APIAuth(handlers.HandleGetEventRegistrations)).Methods("GET")
 
-
-	//для организатора
+	// Events (организатор)
 	router.HandleFunc("/api/events", middleware.OrganizerAuth(handlers.HandleCreateEvent)).Methods("POST")
 	router.HandleFunc("/api/organizer/events", middleware.OrganizerAuth(handlers.HandleGetOrganizerEvents)).Methods("GET")
+	router.HandleFunc("/api/organizer/events/archived", middleware.OrganizerAuth(handlers.HandleGetOrganizerArchivedEvents)).Methods("GET")
 	router.HandleFunc("/api/events/{id}", middleware.OrganizerAuth(handlers.HandleUpdateEvent)).Methods("PUT")
 	router.HandleFunc("/api/events/{id}", middleware.OrganizerAuth(handlers.HandleDeleteEvent)).Methods("DELETE")
-	//просмотр архива
-	router.HandleFunc("/api/organizer/events/archived", middleware.OrganizerAuth(handlers.HandleGetOrganizerArchivedEvents)).Methods("GET")
-	//просмтор статистики мероприятия
 	router.HandleFunc("/api/events/{id}/stats", middleware.OrganizerAuth(handlers.HandleEventStats)).Methods("GET")
-	//закрытие мероприятия
 	router.HandleFunc("/api/events/{id}/close", middleware.OrganizerAuth(handlers.HandleCloseEvent)).Methods("POST")
-	//просмтор людей, которые зарегались
 	router.HandleFunc("/api/events/{id}/attendees", middleware.OrganizerAuth(handlers.HandleEventAttendees)).Methods("GET")
 
-	//для картинок
-	// Раздача статических файлов из папки uploads
+	// Static files
 	router.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
 
-	// Публичный эндпоинт для проверки работоспособности (без ключа)
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
@@ -110,6 +114,7 @@ func main() {
 	}
 
 	log.Printf("Server starting on port %s", port)
+	log.Printf("Swagger UI: http://localhost:%s/swagger/index.html", port)
 	if err := http.ListenAndServe(":"+port, corsMiddleware(router)); err != nil {
 		log.Fatal(err)
 	}
