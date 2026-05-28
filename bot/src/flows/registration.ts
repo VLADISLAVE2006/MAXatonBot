@@ -1,4 +1,4 @@
-import { Keyboard } from "@maxhub/max-bot-api";
+import { FileAttachment, Keyboard } from "@maxhub/max-bot-api";
 import {
     getSession,
     setSession,
@@ -12,6 +12,7 @@ import {
     setFlow,
 } from "@/context";
 import { api } from "@/api";
+import { env } from "@/env";
 import { sendHub, hubKeyboard } from "@/commands/menu";
 
 const ConsentKeyboard = Keyboard.inlineKeyboard([
@@ -30,11 +31,32 @@ export async function startRegistration(ctx: AppContext) {
         return;
     }
 
+    let agreementVersion = "1.0";
+    let agreementFile: ReturnType<InstanceType<typeof FileAttachment>["toJson"]> | null = null;
+
+    try {
+        const agreement = await api.agreement.getCurrent();
+        agreementVersion = agreement.version;
+
+        const fileRes = await fetch(`${env.API_URL}${agreement.file_url}`);
+        if (fileRes.ok) {
+            const fileBlob = await fileRes.blob();
+            const { url: uploadUrl } = await ctx.api.raw.uploads.getUploadUrl({ type: "file" });
+            const formData = new FormData();
+            formData.append("data", fileBlob, `agreement_${agreementVersion}.pdf`);
+            const uploadRes = await fetch(uploadUrl, { method: "POST", body: formData });
+            const uploadData = (await uploadRes.json()) as { token: string };
+            agreementFile = new FileAttachment({ token: uploadData.token }).toJson();
+        }
+    } catch (error) {
+        console.error("Failed to fetch agreement:", error);
+    }
+
     resetSession(userId);
     setSession(userId, {
         flow: "registration",
         step: "registration/consent",
-        data: {},
+        data: { agreementVersion },
         role: null,
         token: null,
     });
@@ -47,11 +69,10 @@ export async function startRegistration(ctx: AppContext) {
         "ℹ️ Неофициальный студенческий проект, не аффилирован с университетом."
     );
 
-    // TODO: прикрепить файл с политикой обработки персональных данных
     await ctx.reply(
         "Для работы мне понадобится ваше имя — оно будет отображаться в списке участников.\n\n" +
         "Разрешаете обработку персональных данных?",
-        { attachments: [ConsentKeyboard] },
+        { attachments: [...(agreementFile ? [agreementFile] : []), ConsentKeyboard] },
     );
 }
 
@@ -80,7 +101,8 @@ export async function handleRegistrationCallback(ctx: AppContext): Promise<boole
         case "consent:accept":
             if (session.step !== "registration/consent") return false;
             try {
-                await api.user.consent(userId, true, "1.0");
+                const { agreementVersion } = session.data as { agreementVersion?: string };
+                await api.user.consent(userId, true, agreementVersion ?? "1.0");
                 const userInfo = await api.user.me(userId);
                 setRole(userId, userInfo.role);
                 setToken(userId, userInfo.token);

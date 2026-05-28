@@ -76,6 +76,12 @@ export const api = {
                 body: JSON.stringify({ registration_ids: registrationIds }),
             }),
     },
+    agreement: {
+        getCurrent: () =>
+            _fetch<{ version: string; file_url: string }>("/api/agreement/current", {
+                method: "GET",
+            }),
+    },
     admin: {
         createOrganizer: (userId: number, fullName: string, token: string) =>
             _fetch("/api/admin/organizers", {
@@ -84,6 +90,16 @@ export const api = {
                 body: JSON.stringify({ user_id: userId, full_name: fullName }),
                 token,
             }),
+        uploadAgreement: (version: string, fileBlob: Blob, filename: string, token: string) => {
+            const form = new FormData();
+            form.append("version", version);
+            form.append("file", fileBlob, filename);
+            return _fetch<{ status: string; version: string }>("/api/admin/agreement", {
+                method: "POST",
+                body: form,
+                token,
+            });
+        },
     },
     events: {
         getEvents: (token: string) =>

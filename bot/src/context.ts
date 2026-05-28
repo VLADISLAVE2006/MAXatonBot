@@ -11,6 +11,8 @@ export type Step =
     | "review/comment"
     | "admin/create_organizer_id"
     | "admin/create_organizer_name"
+    | "admin/upload_agreement_version"
+    | "admin/upload_agreement_file"
     | "csv_upload/waiting_file";
 
 export type AppUser = User & {

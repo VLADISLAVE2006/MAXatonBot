@@ -8,6 +8,7 @@ export const hubKeyboard = (role?: Role | null) => {
     if (role === "admin") {
         return Keyboard.inlineKeyboard([
             [Keyboard.button.callback("👤 Создать организатора", "admin:create_organizer")],
+            [Keyboard.button.callback("📄 Загрузить соглашение", "admin:upload_agreement")],
         ]);
     }
     const isOrganizer = role === "organizer";
