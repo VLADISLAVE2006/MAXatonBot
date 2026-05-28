@@ -1,4 +1,4 @@
-import { Bot } from "@maxhub/max-bot-api";
+import { Bot, Keyboard } from "@maxhub/max-bot-api";
 import type { AppContext } from "@/context";
 import { api } from "@/api";
 import { env } from "@/env";
@@ -10,13 +10,6 @@ interface EventChangePayload {
     new_data: Record<string, unknown>;
 }
 
-interface Attendee {
-    user_id: number;
-    full_name: string;
-    registered_at: number;
-    attended: boolean;
-}
-
 async function notifyRegisteredUsers(
     bot: Bot<AppContext>,
     eventId: number,
@@ -25,10 +18,10 @@ async function notifyRegisteredUsers(
     newData: Record<string, unknown>
 ) {
     try {
-        const attendees = await api.events.getEventAttendees(eventId);
-        
-        if (attendees.length === 0) {
-            console.log(`No attendees for event ${eventId}, skipping notifications`);
+        const userIds = await api.events.getEventRegistrations(eventId);
+
+        if (userIds.length === 0) {
+            console.log(`No registrations for event ${eventId}, skipping notifications`);
             return;
         }
 
@@ -45,42 +38,44 @@ async function notifyRegisteredUsers(
 
         const changes = changedFields
             .map(field => {
-                const oldValue = oldData[field];
                 const newValue = newData[field];
                 const fieldName = fieldNames[field] || field;
-                
-                if (field === "date" && typeof oldValue === "number" && typeof newValue === "number") {
-                    const oldDate = new Date(oldValue * 1000).toLocaleString("ru-RU");
-                    const newDate = new Date(newValue * 1000).toLocaleString("ru-RU");
-                    return `• ${fieldName}: ${oldDate} → ${newDate}`;
+
+                if (field === "date" && typeof newValue === "number") {
+                    return `• ${fieldName}: ${new Date(newValue * 1000).toLocaleString("ru-RU")}`;
                 }
-                
-                return `• ${fieldName}: ${oldValue} → ${newValue}`;
+
+                return `• ${fieldName}: ${newValue}`;
             })
             .join("\n");
 
         const eventTitle = (newData.title as string) || (oldData.title as string) || "Мероприятие";
-        
-        const message = `⚠️ <b>Изменения в мероприятии, на которое вы записаны!</b>\n\n` +
+
+        const message =
+            `📢 Мероприятие, на которое вы записаны, обновилось!\n\n` +
             `📌 ${eventTitle}\n\n` +
-            `<b>Что изменилось:</b>\n${changes}\n\n` +
-            `Актуальную информацию можно посмотреть в боте: /menu`;
+            `Вот что изменилось:\n${changes}`;
+
+        const keyboard = Keyboard.inlineKeyboard([
+            [Keyboard.button.callback("📋 Посмотреть мероприятие", `hub_my_event:${eventId}`)],
+            [Keyboard.button.callback("🏠 Главное меню", "menu:hub_new")],
+        ]);
 
         let sentCount = 0;
-        for (const attendee of attendees) {
+        for (const userId of userIds) {
             try {
-                const notificationsEnabled = await api.user.getNotificationsEnabled(attendee.user_id);
+                const notificationsEnabled = await api.user.getNotificationsEnabled(userId);
                 if (!notificationsEnabled) {
                     continue;
                 }
-                
-                await bot.api.sendMessageToUser(attendee.user_id, message);
+
+                await bot.api.sendMessageToUser(userId, message, { attachments: [keyboard] });
                 sentCount++;
             } catch (error) {
-                console.error(`Failed to send notification to user ${attendee.user_id}:`, error);
+                console.error(`Failed to send notification to user ${userId}:`, error);
             }
         }
-        
+
         console.log(`Sent ${sentCount} notifications for event ${eventId} (${changedFields.length} changes)`);
     } catch (error) {
         console.error("Failed to notify registered users:", error);

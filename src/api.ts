@@ -206,6 +206,8 @@ export const api = {
                 body: JSON.stringify({ rating, ...(comment ? { comment } : {}) }),
                 token,
             }),
+        getEventRegistrations: (id: number) =>
+            _fetch<number[]>(`/api/events/${id}/registrations`, { method: "GET" }),
         uploadEventsCSV: (csvBlob: Blob, filename: string, token: string) => {
             const form = new FormData();
             form.append("file", csvBlob, filename);

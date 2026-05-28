@@ -24,7 +24,7 @@ async function sendReminders(bot: Bot<AppContext>, reminderType: "day_before" | 
 
     if (allReminders.length === 0) return;
 
-    const reminders = allReminders.filter(r => r.reminder_type === reminderType);
+    const reminders = allReminders.filter((r) => r.reminder_type === reminderType);
 
     if (reminders.length === 0) return;
 
@@ -33,22 +33,23 @@ async function sendReminders(bot: Bot<AppContext>, reminderType: "day_before" | 
     for (const reminder of reminders) {
         const eventDate = new Date(reminder.event_date * 1000);
         const now = new Date();
-        
+
         if (eventDate < now) continue;
-        
-        const timeLeftMessage = reminderType === "day_before" 
-            ? "🎯 Мероприятие состоится ЗАВТРА!" 
-            : `⏰ Мероприятие состоится СЕГОДНЯ в ${formatDate(reminder.event_date)}!`;
-        
+
+        const timeLeftMessage =
+            reminderType === "day_before"
+                ? `завтра в ${formatDate(reminder.event_date)}`
+                : `сегодня в ${formatDate(reminder.event_date)}`;
+
         try {
             const notificationsEnabled = await api.user.getNotificationsEnabled(reminder.user_id);
             if (!notificationsEnabled) {
                 continue;
             }
-            
+
             await bot.api.sendMessageToUser(
                 reminder.user_id,
-                `🔔 Напоминание о мероприятии!\n\n${timeLeftMessage}\n\n📌 ${reminder.event_title}\n\nНе пропустите! Подробности можно посмотреть в боте: /menu`
+                `🔔 Напоминание\n\n📌 ${reminder.event_title}\nСостоится ${timeLeftMessage}\n\nОткройте бота, чтобы посмотреть детали.`,
             );
             sent.push(reminder.registration_id);
         } catch (error) {
@@ -75,9 +76,8 @@ async function sendHourBeforeReminders(bot: Bot<AppContext>) {
 }
 
 export function initReminders(bot: Bot<AppContext>) {
-    cron.schedule("0 10 * * *", () => sendDayBeforeReminders(bot));
-    cron.schedule("0 * * * *", () => sendHourBeforeReminders(bot));
-    cron.schedule("*/30 * * * *", () => sendHourBeforeReminders(bot));
-    
-    console.log("✅ Reminders initialized: day-before at 10:00, hour-before every hour");
+    cron.schedule("0 7 * * *", () => sendDayBeforeReminders(bot), { timezone: "Europe/Moscow" });
+    cron.schedule("*/30 * * * *", () => sendHourBeforeReminders(bot), { timezone: "Europe/Moscow" });
+
+    console.log("Reminders initialized: day-before at 10:00, hour-before every 30 min");
 }
