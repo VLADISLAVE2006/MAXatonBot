@@ -17,6 +17,7 @@ import (
     "strings"
 	"github.com/lib/pq"
 	"github.com/gorilla/mux"
+    "encoding/csv"
 )
 
 type Registration struct {
@@ -768,6 +769,137 @@ func HandleCreateEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 
+
+
+// UploadEventsResponse структура ответа
+type UploadEventsResponse struct {
+    Created   int               `json:"created"`
+    Errors    map[int]string    `json:"errors,omitempty"` // строка -> сообщение об ошибке
+}
+
+// HandleUploadEventsCSV – массовое создание мероприятий из CSV
+func HandleUploadEventsCSV(w http.ResponseWriter, r *http.Request) {
+    claims := middleware.GetClaims(r)
+    userID := claims.UserID
+
+    // Проверяем, что роль – организатор (middleware OrganizerAuth уже есть, но для надёжности)
+    // ... (можно оставить как есть, OrganizerAuth уже проверяет)
+
+    // Парсим файл
+    err := r.ParseMultipartForm(10 << 20) // 10 MB
+    if err != nil {
+        writeError(w, http.StatusBadRequest, "form too large")
+        return
+    }
+
+    file, header, err := r.FormFile("file")
+    if err != nil {
+        writeError(w, http.StatusBadRequest, "file is required")
+        return
+    }
+    defer file.Close()
+
+    // Проверяем расширение .csv
+    if !strings.HasSuffix(strings.ToLower(header.Filename), ".csv") {
+        writeError(w, http.StatusBadRequest, "only CSV files are allowed")
+        return
+    }
+
+    reader := csv.NewReader(file)
+    reader.FieldsPerRecord = -1 // разрешаем разное количество полей? Но лучше фиксированное.
+    rows, err := reader.ReadAll()
+    if err != nil {
+        log.Printf("CSV read error: %v", err)
+        writeError(w, http.StatusBadRequest, "invalid CSV format")
+        return
+    }
+    if len(rows) < 2 {
+        writeError(w, http.StatusBadRequest, "CSV must have header and at least one data row")
+        return
+    }
+
+    // Проверяем заголовки (опционально)
+    headerRow := rows[0]
+    expectedHeaders := []string{"title", "description", "content", "max_slots", "cancellation_rules", "date", "format", "type"}
+    if len(headerRow) != len(expectedHeaders) {
+        writeError(w, http.StatusBadRequest, "invalid header count")
+        return
+    }
+    for i, h := range expectedHeaders {
+        if strings.ToLower(headerRow[i]) != h {
+            writeError(w, http.StatusBadRequest, fmt.Sprintf("expected column %s, got %s", h, headerRow[i]))
+            return
+        }
+    }
+
+    response := UploadEventsResponse{
+        Errors: make(map[int]string),
+    }
+
+    // Обрабатываем строки, начиная с 1
+    for i := 1; i < len(rows); i++ {
+        row := rows[i]
+        if len(row) < 8 {
+            response.Errors[i+1] = "not enough columns"
+            continue
+        }
+
+        title := strings.TrimSpace(row[0])
+        description := strings.TrimSpace(row[1])
+        content := strings.TrimSpace(row[2])
+        maxSlotsStr := strings.TrimSpace(row[3])
+        cancellationRules := strings.TrimSpace(row[4])
+        dateStr := strings.TrimSpace(row[5])
+        format := strings.TrimSpace(row[6])
+        eventType := strings.TrimSpace(row[7])
+
+        // Валидация
+        if title == "" || description == "" || content == "" || format == "" || eventType == "" || dateStr == "" {
+            response.Errors[i+1] = "missing required field"
+            continue
+        }
+        date, err := strconv.ParseInt(dateStr, 10, 64)
+        if err != nil || date <= time.Now().Unix() {
+            response.Errors[i+1] = "invalid or past date"
+            continue
+        }
+        if format != "online" && format != "offline" {
+            response.Errors[i+1] = "format must be 'online' or 'offline'"
+            continue
+        }
+
+        var maxSlots *int
+        if maxSlotsStr != "" {
+            ms, err := strconv.Atoi(maxSlotsStr)
+            if err == nil && ms > 0 {
+                maxSlots = &ms
+            }
+        }
+        var cancellationRulesPtr *string
+        if cancellationRules != "" {
+            cancellationRulesPtr = &cancellationRules
+        }
+
+        // Вставка в БД (без картинки)
+        _, err = db.DB.Exec(`
+            INSERT INTO events
+                (title, description, content, max_slots, cancellation_rules, date, format, type, created_by, image_url)
+            VALUES ($1, $2, $3, $4, $5, to_timestamp($6), $7, $8, $9, '')
+        `, title, description, content, maxSlots, cancellationRulesPtr, date, format, eventType, userID)
+        if err != nil {
+            log.Printf("CSV insert error (row %d): %v", i+1, err)
+            response.Errors[i+1] = "database error"
+            continue
+        }
+        response.Created++
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(response)
+}
+
+
 // HandleGetOrganizerEvents возвращает список мероприятий, созданных текущим организатором
 func HandleGetOrganizerEvents(w http.ResponseWriter, r *http.Request) {
     claims := middleware.GetClaims(r)
@@ -864,7 +996,7 @@ func HandleUpdateEvent(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // === НОВАЯ ПРОВЕРКА: новая дата должна быть в будущем ===
+    // новая дата должна быть в будущем ===
     if date <= time.Now().Unix() {
         writeError(w, http.StatusBadRequest, "event date must be in the future")
         return
