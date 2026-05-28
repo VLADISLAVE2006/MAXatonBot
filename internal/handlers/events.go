@@ -22,6 +22,28 @@ import (
 	"github.com/lib/pq"
 )
 
+type OldEventData struct {
+	Title             string
+	Description       string
+	Content           string
+	MaxSlots          *int
+	CancellationRules *string
+	Date              int64
+	Format            string
+	Type              string
+	ImageURL          string
+	CreatedBy         int64
+}
+
+type PendingReminder struct {
+	RegistrationID int    `json:"registration_id"`
+	UserID         int64  `json:"user_id"`
+	EventID        int    `json:"event_id"`
+	EventTitle     string `json:"event_title"`
+	EventDate      int64  `json:"event_date"`
+	ReminderType   string `json:"reminder_type"`
+}
+
 type Registration struct {
 	ID           int    `json:"id"`
 	EventID      int    `json:"event_id"`
@@ -72,6 +94,54 @@ type CreateEventRequest struct {
 	Date              int64   `json:"date"`   // unix timestamp
 	Format            string  `json:"format"` // "online" или "offline"
 	Type              string  `json:"type"`
+}
+
+func HandleGetPendingReminders(w http.ResponseWriter, r *http.Request) {
+	rows, err := db.DB.Query(`
+        SELECT 
+            r.id, 
+            r.user_id, 
+            e.id, 
+            e.title, 
+            EXTRACT(epoch FROM e.date)::bigint,
+            CASE
+                WHEN EXTRACT(epoch FROM e.date) - EXTRACT(epoch FROM NOW()) <= 3600 
+                     AND EXTRACT(epoch FROM e.date) - EXTRACT(epoch FROM NOW()) > 0
+                THEN 'hour_before'
+                WHEN EXTRACT(epoch FROM e.date) - EXTRACT(epoch FROM NOW()) <= 86400 
+                     AND EXTRACT(epoch FROM e.date) - EXTRACT(epoch FROM NOW()) > 82800
+                THEN 'day_before'
+                ELSE NULL
+            END AS reminder_type
+        FROM registrations r
+        JOIN events e ON r.event_id = e.id
+        JOIN users u ON r.user_id = u.user_id
+        WHERE e.date > NOW()
+          AND e.date <= NOW() + INTERVAL '36 hours'
+          AND r.reminder_sent = false
+          AND COALESCE(u.notifications_enabled, true) = true
+    `)
+	if err != nil {
+		log.Printf("GetPendingReminders DB error: %v", err)
+		writeError(w, http.StatusInternalServerError, "database error")
+		return
+	}
+	defer rows.Close()
+
+	reminders := []PendingReminder{}
+	for rows.Next() {
+		var r PendingReminder
+		if err := rows.Scan(&r.RegistrationID, &r.UserID, &r.EventID, &r.EventTitle, &r.EventDate, &r.ReminderType); err != nil {
+			log.Printf("scan error: %v", err)
+			continue
+		}
+		if r.ReminderType == "day_before" || r.ReminderType == "hour_before" {
+			reminders = append(reminders, r)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(reminders)
 }
 
 // Для абитуриента
@@ -358,50 +428,39 @@ func HandleMyRegistrations(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(registrations)
 }
 
-// структура для формирования напоминаний
-type PendingReminder struct {
-	RegistrationID int    `json:"registration_id"`
-	UserID         int64  `json:"user_id"`
-	EventID        int    `json:"event_id"`
-	EventTitle     string `json:"event_title"`
-	EventDate      int64  `json:"event_date"` // unix timestamp
+type MarkSentRequest struct {
+	RegistrationIDs []int `json:"registration_ids"`
 }
 
-// HandleGetPendingReminders возвращает список напоминаний, которые нужно отправить за день до мероприятия
-func HandleGetPendingReminders(w http.ResponseWriter, r *http.Request) {
-	rows, err := db.DB.Query(`
-        SELECT r.id, r.user_id, e.id, e.title, EXTRACT(epoch FROM e.date)::bigint
-        FROM registrations r
-        JOIN events e ON r.event_id = e.id
-        JOIN users u ON r.user_id = u.user_id
-        WHERE e.date > NOW()
-          AND e.date <= NOW() + INTERVAL '36 hours'
-          AND r.reminder_sent = false
-          AND COALESCE(u.notifications_enabled, true) = true
-    `)
+// HandleGetEventRegistrations возвращает user_id всех записавшихся на мероприятие (внутренний эндпоинт для бота)
+func HandleGetEventRegistrations(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(mux.Vars(r)["id"])
 	if err != nil {
-		log.Printf("GetPendingReminders DB error: %v", err)
+		writeError(w, http.StatusBadRequest, "invalid event id")
+		return
+	}
+
+	rows, err := db.DB.Query(
+		`SELECT user_id FROM registrations WHERE event_id = $1`, id,
+	)
+	if err != nil {
+		log.Printf("HandleGetEventRegistrations DB error: %v", err)
 		writeError(w, http.StatusInternalServerError, "database error")
 		return
 	}
 	defer rows.Close()
 
-	reminders := []PendingReminder{}
+	userIDs := []int64{}
 	for rows.Next() {
-		var r PendingReminder
-		if err := rows.Scan(&r.RegistrationID, &r.UserID, &r.EventID, &r.EventTitle, &r.EventDate); err != nil {
-			log.Printf("scan error: %v", err)
+		var uid int64
+		if err := rows.Scan(&uid); err != nil {
 			continue
 		}
-		reminders = append(reminders, r)
+		userIDs = append(userIDs, uid)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(reminders)
-}
-
-type MarkSentRequest struct {
-	RegistrationIDs []int `json:"registration_ids"`
+	json.NewEncoder(w).Encode(userIDs)
 }
 
 // HandleMarkRemindersSent отмечает напоминания как отправленные
@@ -983,21 +1042,30 @@ func HandleUpdateEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Проверяем, что мероприятие существует, принадлежит пользователю и не закрыто
-	var createdBy int64
+	// Получаем старые данные мероприятия ДО обновления
+	var oldEvent OldEventData
 	var oldImageURL string
 	var closed bool
-	err = db.DB.QueryRow("SELECT created_by, image_url, closed FROM events WHERE id = $1", id).Scan(&createdBy, &oldImageURL, &closed)
+	err = db.DB.QueryRow(`
+		SELECT title, description, content, max_slots, cancellation_rules,
+		       EXTRACT(epoch FROM date)::bigint, format, type, image_url, closed, created_by
+		FROM events WHERE id = $1
+	`, id).Scan(
+		&oldEvent.Title, &oldEvent.Description, &oldEvent.Content,
+		&oldEvent.MaxSlots, &oldEvent.CancellationRules,
+		&oldEvent.Date, &oldEvent.Format, &oldEvent.Type,
+		&oldImageURL, &closed, &oldEvent.CreatedBy,
+	)
 	if err == sql.ErrNoRows {
 		writeError(w, http.StatusNotFound, "event not found")
 		return
 	}
 	if err != nil {
-		log.Printf("HandleUpdateEvent check error: %v", err)
+		log.Printf("HandleUpdateEvent fetch old data error: %v", err)
 		writeError(w, http.StatusInternalServerError, "database error")
 		return
 	}
-	if createdBy != userID {
+	if oldEvent.CreatedBy != userID {
 		writeError(w, http.StatusForbidden, "you can only edit your own events")
 		return
 	}
@@ -1031,7 +1099,6 @@ func HandleUpdateEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// новая дата должна быть в будущем ===
 	if date <= time.Now().Unix() {
 		writeError(w, http.StatusBadRequest, "event date must be in the future")
 		return
@@ -1095,6 +1162,62 @@ func HandleUpdateEvent(w http.ResponseWriter, r *http.Request) {
 		}
 		writeError(w, http.StatusInternalServerError, "failed to update event")
 		return
+	}
+
+	changedFields := []string{}
+	oldData := make(map[string]interface{})
+	newData := make(map[string]interface{})
+
+	if oldEvent.Title != title {
+		changedFields = append(changedFields, "title")
+		oldData["title"] = oldEvent.Title
+		newData["title"] = title
+	}
+	if oldEvent.Description != description {
+		changedFields = append(changedFields, "description")
+		oldData["description"] = oldEvent.Description
+		newData["description"] = description
+	}
+	if oldEvent.Content != content {
+		changedFields = append(changedFields, "content")
+		oldData["content"] = oldEvent.Content
+		newData["content"] = content
+	}
+	if oldEvent.Date != date {
+		changedFields = append(changedFields, "date")
+		oldData["date"] = oldEvent.Date
+		newData["date"] = date
+	}
+	if oldEvent.Format != format {
+		changedFields = append(changedFields, "format")
+		oldData["format"] = oldEvent.Format
+		newData["format"] = format
+	}
+	if oldEvent.Type != eventType {
+		changedFields = append(changedFields, "type")
+		oldData["type"] = oldEvent.Type
+		newData["type"] = eventType
+	}
+	oldMaxSlots := 0
+	if oldEvent.MaxSlots != nil {
+		oldMaxSlots = *oldEvent.MaxSlots
+	}
+	newMaxSlots := 0
+	if maxSlots != nil {
+		newMaxSlots = *maxSlots
+	}
+	if oldMaxSlots != newMaxSlots {
+		changedFields = append(changedFields, "max_slots")
+		oldData["max_slots"] = oldMaxSlots
+		newData["max_slots"] = newMaxSlots
+	}
+	if oldImageURL != newImageURL {
+		changedFields = append(changedFields, "image_url")
+		oldData["image_url"] = oldImageURL
+		newData["image_url"] = newImageURL
+	}
+	if len(changedFields) > 0 {
+		go SendWebhookNotification(id, changedFields, oldData, newData)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
