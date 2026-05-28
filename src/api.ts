@@ -218,5 +218,14 @@ export const api = {
                 body: JSON.stringify({ rating, ...(comment ? { comment } : {}) }),
                 token,
             }),
+        uploadEventsCSV: (csvBlob: Blob, filename: string, token: string) => {
+            const form = new FormData();
+            form.append("file", csvBlob, filename);
+            return _fetch<{ created: number; errors: Record<number, string> }>("/api/events/upload", {
+                method: "POST",
+                body: form,
+                token,
+            });
+        },
     },
 };

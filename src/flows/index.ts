@@ -6,6 +6,7 @@ import { handleRegistrationCallback, handleRegistrationMessage, startRegistratio
 import { handleAttendDeeplink, handleRegisterDeeplink } from "@/commands/register";
 import { handleReviewCallback, handleReviewMessage } from "./review";
 import { handleAdminCallback, handleAdminMessage } from "./admin";
+import { handleCsvUploadCallback, handleCsvUploadMessage } from "./csv_upload";
 
 type FlowRouter = {
     onBotStarted?: (ctx: AppContext) => void | Promise<void>;
@@ -26,6 +27,10 @@ const flows: FlowRouter[] = [
     {
         onMessageCreated: handleAdminMessage,
         onMessageCallback: handleAdminCallback,
+    },
+    {
+        onMessageCreated: handleCsvUploadMessage,
+        onMessageCallback: handleCsvUploadCallback,
     },
 ];
 

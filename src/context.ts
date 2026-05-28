@@ -2,7 +2,7 @@ import { Context } from "@maxhub/max-bot-api";
 import type { User } from "@maxhub/max-bot-api/types";
 import type { Role } from "@/types/app";
 
-export type FlowName = "registration" | "review" | "admin";
+export type FlowName = "registration" | "review" | "admin" | "csv_upload";
 
 export type Step =
     | "registration/consent"
@@ -10,7 +10,8 @@ export type Step =
     | "registration/organizer_request"
     | "review/comment"
     | "admin/create_organizer_id"
-    | "admin/create_organizer_name";
+    | "admin/create_organizer_name"
+    | "csv_upload/waiting_file";
 
 export type AppUser = User & {
     role: Role | null | undefined;
