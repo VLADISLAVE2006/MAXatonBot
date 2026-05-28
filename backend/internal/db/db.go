@@ -1,0 +1,239 @@
+package db
+
+import (
+	"database/sql"
+	"fmt"
+	"log"
+	"os"
+	"strings"
+
+	"strconv"
+
+	_ "github.com/lib/pq" // драйвер PostgreSQL
+)
+
+// DB - глобальный объект базы данных 
+var DB *sql.DB
+
+func InitDB() error {
+	// Формируем строку подключения
+	connStr := fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		os.Getenv("DB_HOST"),
+		os.Getenv("DB_PORT"),
+		os.Getenv("DB_USER"),
+		os.Getenv("DB_PASSWORD"),
+		os.Getenv("DB_NAME"),
+	)
+
+	var err error
+	DB, err = sql.Open("postgres", connStr)
+	if err != nil {
+		return fmt.Errorf("failed to open db: %w", err)
+	}
+
+	// Проверяем соединение
+	if err = DB.Ping(); err != nil {
+		return fmt.Errorf("cannot ping db: %w", err)
+	}
+
+	log.Println("Connected to PostgreSQL")
+
+	// Создаём таблицу users, если ещё не создана
+	createTableSQL := `
+    CREATE TABLE IF NOT EXISTS users (
+        user_id         BIGINT PRIMARY KEY,
+        full_name       TEXT,
+        role            TEXT NOT NULL DEFAULT 'applicant',
+        consent_given   BOOLEAN NOT NULL DEFAULT false,
+        consent_date    TIMESTAMP WITH TIME ZONE,
+        consent_version TEXT,
+		notifications_enabled BOOLEAN DEFAULT true
+    );`
+	_, err = DB.Exec(createTableSQL)
+	if err != nil {
+		return fmt.Errorf("failed to create table: %w", err)
+	}
+
+	log.Println("Table 'users' is ready")
+
+	createEventsTableSQL := `
+	CREATE TABLE IF NOT EXISTS events (
+		id                 SERIAL PRIMARY KEY,
+		title              VARCHAR NOT NULL,
+		description        VARCHAR NOT NULL,
+		content            TEXT NOT NULL,
+		max_slots          INT,
+		cancellation_rules TEXT,
+		date               TIMESTAMP WITH TIME ZONE NOT NULL,
+		format             VARCHAR NOT NULL,
+		type               VARCHAR NOT NULL,
+		created_by         BIGINT NOT NULL REFERENCES users(user_id),
+		created_at         TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+		updated_at         TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+		closed             BOOLEAN DEFAULT false,
+		image_url          TEXT
+	);`
+	_, err = DB.Exec(createEventsTableSQL)
+	if err != nil {
+		return fmt.Errorf("failed to create events table: %w", err)
+	}
+	
+	log.Println("Table 'events' is ready")
+	if err := ensureDefaultAgreement(); err != nil {
+		log.Printf("Warning: could not ensure default agreement: %v", err)
+	}
+
+	// Таблица регистраций
+	createRegistrationsTableSQL := `
+	CREATE TABLE IF NOT EXISTS registrations (
+		id            SERIAL PRIMARY KEY,
+		user_id       BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+		event_id      INT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+		registered_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+		code          TEXT NOT NULL UNIQUE,
+		reminder_sent BOOLEAN DEFAULT false,
+		attended      BOOLEAN DEFAULT false
+	);
+	`
+	_, err = DB.Exec(createRegistrationsTableSQL)
+	if err != nil {
+		return fmt.Errorf("failed to create registrations table: %w", err)
+	}
+	log.Println("Table 'registrations' is ready")
+
+	// Индекс для быстрого поиска
+	_, err = DB.Exec("CREATE INDEX IF NOT EXISTS idx_registrations_user_id ON registrations(user_id)")
+	if err != nil {
+		log.Printf("Warning: could not create index: %v", err)
+	}
+
+	//таблица отзывов
+	createReviewsTableSQL := `
+	CREATE TABLE IF NOT EXISTS reviews (
+		id SERIAL PRIMARY KEY,
+		event_id INT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+		user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+		rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+		comment TEXT,
+		created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+		UNIQUE(event_id, user_id)
+	);`
+	_, err = DB.Exec(createReviewsTableSQL)
+	if err != nil {
+		return fmt.Errorf("failed to create reviews table: %w", err)
+	}
+	log.Println("Table 'reviews' is ready")
+
+
+	// Таблица версий пользовательского соглашения
+	createAgreementsTableSQL := `
+	CREATE TABLE IF NOT EXISTS agreements (
+		id SERIAL PRIMARY KEY,
+		version TEXT NOT NULL UNIQUE,
+		file_path TEXT NOT NULL,
+		created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+		is_active BOOLEAN DEFAULT false
+	);`
+	_, err = DB.Exec(createAgreementsTableSQL)
+	if err != nil {
+		return fmt.Errorf("failed to create agreements table: %w", err)
+	}
+	log.Println("Table 'agreements' is ready")
+
+
+	if err := ensureAdmin(); err != nil {
+		log.Printf("Warning: could not ensure admin: %v", err)
+	}
+
+	return nil
+}
+
+// создаем админа при первом запуске таблиццы
+func ensureAdmin() error {
+	adminIDStr := os.Getenv("ADMIN_USER_ID")
+	if adminIDStr == "" {
+		log.Println("ADMIN_USER_ID not set, skipping admin initialization")
+		return nil
+	}
+	adminID, err := strconv.ParseInt(adminIDStr, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid ADMIN_USER_ID: %w", err)
+	}
+
+	_, err = DB.Exec(`
+        INSERT INTO users (user_id, role, consent_given, full_name, consent_date, consent_version)
+        VALUES ($1, 'admin', true, 'Administrator', NOW(), '1.0')
+        ON CONFLICT (user_id) DO UPDATE SET
+            role = 'admin',
+            consent_given = true,
+            consent_date = NOW()
+    `, adminID)
+	return err
+}
+
+func ensureOrganizers() error {
+	organizersStr := os.Getenv("ORGANIZER_USER_IDS")
+	if organizersStr == "" {
+		log.Println("ORGANIZER_USER_IDS not set, skipping organizers initialization")
+		return nil
+	}
+
+	ids := strings.Split(organizersStr, ",")
+	for _, idStr := range ids {
+		idStr = strings.TrimSpace(idStr)
+		if idStr == "" {
+			continue
+		}
+
+		userID, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			log.Printf("Warning: invalid organizer ID '%s': %v", idStr, err)
+			continue
+		}
+
+		_, err = DB.Exec(`
+			INSERT INTO users (user_id, role, consent_given, full_name, consent_date, consent_version)
+			VALUES ($1, 'organizer', true, 'Organizer', NOW(), '1.0')
+			ON CONFLICT (user_id) DO UPDATE SET
+				role = 'organizer',
+				consent_given = true,
+				consent_date = NOW()
+		`, userID)
+		if err != nil {
+			log.Printf("Warning: failed to ensure organizer %d: %v", userID, err)
+			continue
+		}
+		log.Printf("Ensured organizer user_id=%d", userID)
+	}
+	return nil
+}
+
+
+
+func ensureDefaultAgreement() error {
+    var count int
+    err := DB.QueryRow("SELECT COUNT(*) FROM agreements WHERE is_active = true").Scan(&count)
+    if err != nil {
+        return err
+    }
+    if count > 0 {
+        return nil 
+    }
+    // Создаём папку, если нет
+    os.MkdirAll("uploads/agreements", 0755)
+    // Путь к файлу по умолчанию (вы должны сами создать этот файл)
+    defaultPath := "uploads/agreements/agreement_1.0.pdf"
+    // Проверяем, существует ли файл; 
+    if _, err := os.Stat(defaultPath); os.IsNotExist(err) {
+        // Создаём временный файл 
+        f, _ := os.Create(defaultPath)
+        f.WriteString("Default agreement v1.0. Replace with actual PDF.")
+        f.Close()
+    }
+    _, err = DB.Exec(`
+        INSERT INTO agreements (version, file_path, is_active)
+        VALUES ('1.0', $1, true)
+    `, "/"+defaultPath)
+    return err
+}
