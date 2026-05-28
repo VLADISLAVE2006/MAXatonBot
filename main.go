@@ -51,6 +51,7 @@ func main() {
 
 	//для абитуриента
 	router.HandleFunc("/api/events", middleware.UserAuth(handlers.HandleGetEvents)).Methods("GET")
+	router.HandleFunc("/api/events/upload", middleware.OrganizerAuth(handlers.HandleUploadEventsCSV)).Methods("POST")
 	router.HandleFunc("/api/events/{id}", middleware.UserAuth(handlers.HandleGetEventByID)).Methods("GET")
 	//касаемо записи на мероприятие
 	router.HandleFunc("/api/events/{id}/register", middleware.UserAuth(handlers.HandleRegisterEvent)).Methods("POST")
@@ -73,7 +74,6 @@ func main() {
 
 	//для организатора
 	router.HandleFunc("/api/events", middleware.OrganizerAuth(handlers.HandleCreateEvent)).Methods("POST")
-	router.HandleFunc("/api/events/upload", middleware.OrganizerAuth(handlers.HandleUploadEventsCSV)).Methods("POST")
 	router.HandleFunc("/api/organizer/events", middleware.OrganizerAuth(handlers.HandleGetOrganizerEvents)).Methods("GET")
 	router.HandleFunc("/api/events/{id}", middleware.OrganizerAuth(handlers.HandleUpdateEvent)).Methods("PUT")
 	router.HandleFunc("/api/events/{id}", middleware.OrganizerAuth(handlers.HandleDeleteEvent)).Methods("DELETE")
