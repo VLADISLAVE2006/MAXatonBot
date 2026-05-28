@@ -71,9 +71,13 @@ export async function handleHubEventsCallback(ctx: AppContext): Promise<boolean>
         const actionButton = event.is_registered
             ? Keyboard.button.callback("❌ Отменить запись", `cancel:${event.id}`)
             : Keyboard.button.callback("Записаться", `register:${event.id}`);
+        const onlineLinkRow =
+            event.format === "online" && event.content.startsWith("http")
+                ? [[Keyboard.button.link("🔗 Перейти к мероприятию", event.content)]]
+                : [];
         await ctx.editMessage({
             text: buildEventDetailText(event),
-            attachments: [Keyboard.inlineKeyboard([[actionButton], [backToEvents]])],
+            attachments: [Keyboard.inlineKeyboard([...onlineLinkRow, [actionButton], [backToEvents]])],
         });
     } catch {
         await ctx.editMessage({

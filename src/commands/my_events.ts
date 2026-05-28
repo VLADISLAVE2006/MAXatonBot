@@ -155,9 +155,15 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
 
         const backButton = getBackButtonForEventDetail(role, source as "regular" | "archived");
 
+        const onlineLinkRow =
+            event.format === "online" && event.content.startsWith("http")
+                ? [[Keyboard.button.link("🔗 Перейти к мероприятию", event.content)]]
+                : [];
+
         const buttons =
             role === "applicant"
                 ? [
+                      ...onlineLinkRow,
                       ...(isPast && event.closed
                           ? [[Keyboard.button.callback("✍️ Оставить отзыв", `review:${event.id}`)]]
                           : []),
@@ -165,6 +171,7 @@ export async function handleHubMyEventsCallback(ctx: AppContext): Promise<boolea
                       [backButton],
                   ]
                 : [
+                      ...onlineLinkRow,
                       ...(isPast ? [[Keyboard.button.callback("📊 Статистика", `event_stats:${event.id}`)]] : []),
                       ...(isPast && !event.closed
                           ? [[Keyboard.button.callback("🔒 Завершить мероприятие", `close_event:${event.id}`)]]
