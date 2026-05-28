@@ -1,12 +1,11 @@
-import { Keyboard } from "@maxhub/max-bot-api";
+import { Keyboard, FileAttachment } from "@maxhub/max-bot-api";
 import type { FileAttachment as FileAttachmentType } from "@maxhub/max-bot-api/types";
+import { stringify } from "csv-stringify/sync";
 import { getSession, setSession, resetSession, type AppContext, getToken } from "@/context";
 import { api } from "@/api";
 import { backToMyEvents } from "@/commands/menu";
 
-const cancelKeyboard = Keyboard.inlineKeyboard([
-    [Keyboard.button.callback("Отмена", "menu:my_events")],
-]);
+const cancelKeyboard = Keyboard.inlineKeyboard([[Keyboard.button.callback("Отмена", "menu:my_events")]]);
 
 export async function handleCsvUploadCallback(ctx: AppContext): Promise<boolean> {
     const userId = ctx.user?.user_id;
@@ -31,14 +30,58 @@ export async function handleCsvUploadCallback(ctx: AppContext): Promise<boolean>
     await ctx.editMessage({
         text:
             "📤 Загрузка мероприятий из CSV\n\n" +
-            "Отправьте CSV-файл со следующими столбцами (первая строка — заголовки):\n\n" +
-            "title, description, content, max_slots, cancellation_rules, date, format, type\n\n" +
-            "• date — unix timestamp (целое число)\n" +
-            "• format — online или offline\n" +
-            "• max_slots — можно оставить пустым (без ограничений)\n" +
-            "• cancellation_rules — можно оставить пустым",
+            "Скачайте шаблон ниже, заполните и отправьте сюда.\n\n" +
+            "📅 Дата — (например, 01.09.2026 10:00)\n" +
+            "🌐 Формат — онлайн / оффлайн\n" +
+            "✨ Тип — хакатон / олимпиада / конференция / день открытых дверей\n" +
+            "📝 Макс. мест и правила отмены — необязательны",
         attachments: [cancelKeyboard],
     });
+
+    try {
+        const csv = stringify(
+            [
+                ["название", "описание", "место проведения", "макс. мест", "правила отмены", "дата", "формат", "тип"],
+                [
+                    "Хакатон Техностарт",
+                    "Соревнование для разработчиков и дизайнеров",
+                    "проспект Вернадского, 78",
+                    "100",
+                    "Отмена за 24 часа до начала",
+                    "2026-09-01 10:00",
+                    "оффлайн",
+                    "хакатон",
+                ],
+                [
+                    "Олимпиада по программированию",
+                    "Ежегодная студенческая олимпиада по алгоритмам",
+                    "https://webinar.ru/123",
+                    "",
+                    "",
+                    "2026-09-15 11:00",
+                    "онлайн",
+                    "олимпиада",
+                ],
+            ],
+            { bom: true, delimiter: ";" },
+        );
+
+        await ctx.api.sendAction(ctx.chatId!, "sending_file");
+        const csvBuffer = Buffer.from(csv, "utf-8");
+        const { url: uploadUrl } = await ctx.api.raw.uploads.getUploadUrl({ type: "file" });
+        const formData = new FormData();
+        formData.append("data", new Blob([csvBuffer]), "template_events.csv");
+        const uploadRes = await fetch(uploadUrl, { method: "POST", body: formData });
+        const uploadData = (await uploadRes.json()) as { token: string };
+        const file = new FileAttachment({ token: uploadData.token });
+        await new Promise((r) => setTimeout(r, 3000));
+        await ctx.reply("📎 Шаблон CSV:", {
+            attachments: [file.toJson(), Keyboard.inlineKeyboard([[backToMyEvents]])],
+        });
+    } catch (error) {
+        console.error("Failed to send CSV template:", error);
+    }
+
     return true;
 }
 
