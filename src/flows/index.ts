@@ -1,3 +1,4 @@
+// src/flows/index.ts
 import type { Bot } from "@maxhub/max-bot-api";
 import { sendHub } from "@/commands/menu";
 import { collectCommandCallbackHandlers } from "@/commands";

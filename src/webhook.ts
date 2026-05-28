@@ -16,7 +16,6 @@ interface Attendee {
     attended: boolean;
 }
 
-// Отправка уведомления всем записанным на мероприятие
 async function notifyRegisteredUsers(
     bot: Bot<AppContext>,
     eventId: number,
@@ -25,7 +24,6 @@ async function notifyRegisteredUsers(
     newData: Record<string, unknown>
 ) {
     try {
-        // Получаем список записанных пользователей
         const attendees = await api.events.getEventAttendees(eventId);
         
         if (attendees.length === 0) {
@@ -33,7 +31,6 @@ async function notifyRegisteredUsers(
             return;
         }
 
-        // Формируем сообщение об изменениях
         const fieldNames: Record<string, string> = {
             title: "Название",
             description: "Описание",
@@ -51,7 +48,6 @@ async function notifyRegisteredUsers(
                 const newValue = newData[field];
                 const fieldName = fieldNames[field] || field;
                 
-                // Форматирование даты для читаемости
                 if (field === "date" && typeof oldValue === "number" && typeof newValue === "number") {
                     const oldDate = new Date(oldValue * 1000).toLocaleString("ru-RU");
                     const newDate = new Date(newValue * 1000).toLocaleString("ru-RU");
@@ -62,24 +58,22 @@ async function notifyRegisteredUsers(
             })
             .join("\n");
 
-        const eventTitle = newData.title || oldData.title || "Мероприятие";
+        const eventTitle = (newData.title as string) || (oldData.title as string) || "Мероприятие";
         
         const message = `⚠️ <b>Изменения в мероприятии, на которое вы записаны!</b>\n\n` +
             `📌 ${eventTitle}\n\n` +
             `<b>Что изменилось:</b>\n${changes}\n\n` +
             `Актуальную информацию можно посмотреть в боте: /menu`;
 
-        // Отправляем уведомление каждому участнику
         let sentCount = 0;
         for (const attendee of attendees) {
             try {
-                // Проверяем, включены ли у пользователя уведомления
                 const notificationsEnabled = await api.user.getNotificationsEnabled(attendee.user_id);
                 if (!notificationsEnabled) {
                     continue;
                 }
                 
-                await bot.api.sendMessageToUser(attendee.user_id, message, { parse_mode: "HTML" });
+                await bot.api.sendMessageToUser(attendee.user_id, message);
                 sentCount++;
             } catch (error) {
                 console.error(`Failed to send notification to user ${attendee.user_id}:`, error);
@@ -92,15 +86,12 @@ async function notifyRegisteredUsers(
     }
 }
 
-// Обработчик webhook запросов
 export function handleWebhook(bot: Bot<AppContext>) {
     return async (req: Request): Promise<Response> => {
-        // Проверка метода
         if (req.method !== "POST") {
             return new Response("Method not allowed", { status: 405 });
         }
         
-        // Проверка API ключа
         const apiKey = req.headers.get("X-API-Key");
         const expectedKey = process.env.API_KEY;
         
@@ -113,7 +104,6 @@ export function handleWebhook(bot: Bot<AppContext>) {
             const payload: EventChangePayload = await req.json();
             console.log(`Received webhook for event ${payload.event_id}, changes: ${payload.changed_fields.join(", ")}`);
             
-            // Отправляем уведомления записанным пользователям
             await notifyRegisteredUsers(
                 bot,
                 payload.event_id,

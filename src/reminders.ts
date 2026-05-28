@@ -13,31 +13,18 @@ interface Reminder {
     reminder_type: "day_before" | "hour_before";
 }
 
-// Отправка напоминаний определённого типа
 async function sendReminders(bot: Bot<AppContext>, reminderType: "day_before" | "hour_before") {
-    let reminders: Reminder[];
+    let allReminders: Reminder[];
     try {
-        const allReminders = await api.reminders.getPending();
-        // Фильтруем по типу (если API поддерживает фильтрацию)
-        reminders = allReminders.filter(r => {
-            if (reminderType === "day_before") {
-                // Проверяем, что до мероприятия осталось примерно 24 часа
-                const eventDate = new Date(r.event_date * 1000);
-                const now = new Date();
-                const hoursLeft = (eventDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-                return hoursLeft <= 26 && hoursLeft >= 22;
-            } else {
-                // Проверяем, что до мероприятия осталось примерно 1 час
-                const eventDate = new Date(r.event_date * 1000);
-                const now = new Date();
-                const hoursLeft = (eventDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-                return hoursLeft <= 1.5 && hoursLeft >= 0.5;
-            }
-        });
+        allReminders = await api.reminders.getPending();
     } catch (error) {
         console.error(`Failed to fetch pending reminders (${reminderType}):`, error);
         return;
     }
+
+    if (allReminders.length === 0) return;
+
+    const reminders = allReminders.filter(r => r.reminder_type === reminderType);
 
     if (reminders.length === 0) return;
 
@@ -47,7 +34,6 @@ async function sendReminders(bot: Bot<AppContext>, reminderType: "day_before" | 
         const eventDate = new Date(reminder.event_date * 1000);
         const now = new Date();
         
-        // Проверяем, что мероприятие ещё не прошло
         if (eventDate < now) continue;
         
         const timeLeftMessage = reminderType === "day_before" 
@@ -55,20 +41,14 @@ async function sendReminders(bot: Bot<AppContext>, reminderType: "day_before" | 
             : `⏰ Мероприятие состоится СЕГОДНЯ в ${formatDate(reminder.event_date)}!`;
         
         try {
-            // Проверяем, включены ли у пользователя уведомления
             const notificationsEnabled = await api.user.getNotificationsEnabled(reminder.user_id);
             if (!notificationsEnabled) {
-                console.log(`User ${reminder.user_id} has notifications disabled, skipping`);
                 continue;
             }
             
             await bot.api.sendMessageToUser(
                 reminder.user_id,
-                `🔔 <b>Напоминание о мероприятии!</b>\n\n` +
-                    `${timeLeftMessage}\n\n` +
-                    `📌 <b>${reminder.event_title}</b>\n\n` +
-                    `Не пропустите! Подробности можно посмотреть в боте: /menu`,
-                { parse_mode: "HTML" }
+                `🔔 Напоминание о мероприятии!\n\n${timeLeftMessage}\n\n📌 ${reminder.event_title}\n\nНе пропустите! Подробности можно посмотреть в боте: /menu`
             );
             sent.push(reminder.registration_id);
         } catch (error) {
@@ -86,24 +66,17 @@ async function sendReminders(bot: Bot<AppContext>, reminderType: "day_before" | 
     }
 }
 
-// Функция отправки напоминаний за день
 async function sendDayBeforeReminders(bot: Bot<AppContext>) {
     await sendReminders(bot, "day_before");
 }
 
-// Функция отправки напоминаний за час
 async function sendHourBeforeReminders(bot: Bot<AppContext>) {
     await sendReminders(bot, "hour_before");
 }
 
 export function initReminders(bot: Bot<AppContext>) {
-    // Каждый день в 10:00 - напоминания за день
     cron.schedule("0 10 * * *", () => sendDayBeforeReminders(bot));
-    
-    // Каждый час в 00 минут - напоминания за час
     cron.schedule("0 * * * *", () => sendHourBeforeReminders(bot));
-    
-    // Также проверяем каждые 30 минут для более точных напоминаний за час
     cron.schedule("*/30 * * * *", () => sendHourBeforeReminders(bot));
     
     console.log("✅ Reminders initialized: day-before at 10:00, hour-before every hour");
