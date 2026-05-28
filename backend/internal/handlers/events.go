@@ -117,9 +117,15 @@ func HandleGetPendingReminders(w http.ResponseWriter, r *http.Request) {
         JOIN events e ON r.event_id = e.id
         JOIN users u ON r.user_id = u.user_id
         WHERE e.date > NOW()
-          AND e.date <= NOW() + INTERVAL '36 hours'
           AND r.reminder_sent = false
           AND COALESCE(u.notifications_enabled, true) = true
+          AND (
+              (EXTRACT(epoch FROM e.date) - EXTRACT(epoch FROM NOW()) <= 3600
+               AND EXTRACT(epoch FROM e.date) - EXTRACT(epoch FROM NOW()) > 0)
+              OR
+              (EXTRACT(epoch FROM e.date) - EXTRACT(epoch FROM NOW()) <= 86400
+               AND EXTRACT(epoch FROM e.date) - EXTRACT(epoch FROM NOW()) > 82800)
+          )
     `)
 	if err != nil {
 		log.Printf("GetPendingReminders DB error: %v", err)
