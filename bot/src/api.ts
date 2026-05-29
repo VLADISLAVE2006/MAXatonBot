@@ -1,8 +1,36 @@
 import { $fetch } from "ofetch";
 import type { Role } from "@/types/app";
 import { env } from "@/env";
+import { setToken, setRole } from "@/context";
 
-const _fetch = <T>(path: string, options?: RequestInit & { token?: string }) => {
+type FetchOpts = RequestInit & { token?: string };
+
+function extractUserId(token: string): number | null {
+    try {
+        const part = token.split(".")[1];
+        if (!part) return null;
+        const payload = JSON.parse(atob(part));
+        return typeof payload.user_id === "number" ? payload.user_id : null;
+    } catch {
+        return null;
+    }
+}
+
+async function refreshToken(userId: number): Promise<string | null> {
+    try {
+        const data = await $fetch<{ role: Role; full_name: string; token: string }>(
+            `${env.API_URL}/api/user/me?user_id=${userId}`,
+            { headers: { "X-API-Key": env.API_KEY } },
+        );
+        setToken(userId, data.token);
+        setRole(userId, data.role);
+        return data.token;
+    } catch {
+        return null;
+    }
+}
+
+const _fetch = async <T>(path: string, options?: FetchOpts, _retry = false): Promise<T> => {
     const headers = new Headers(options?.headers);
 
     if (env.API_KEY) {
@@ -13,10 +41,20 @@ const _fetch = <T>(path: string, options?: RequestInit & { token?: string }) => 
         headers.set("Authorization", `Bearer ${options.token}`);
     }
 
-    return $fetch<T>(`${env.API_URL}${path}`, {
-        ...options,
-        headers,
-    });
+    try {
+        return await $fetch<T>(`${env.API_URL}${path}`, { ...options, headers });
+    } catch (error: any) {
+        if (!_retry && error?.status === 401 && options?.token) {
+            const userId = extractUserId(options.token);
+            if (userId !== null) {
+                const newToken = await refreshToken(userId);
+                if (newToken) {
+                    return _fetch<T>(path, { ...options, token: newToken }, true);
+                }
+            }
+        }
+        throw error;
+    }
 };
 
 export const api = {
